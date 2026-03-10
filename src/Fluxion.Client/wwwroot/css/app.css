@@ -1,0 +1,296 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+:root {
+    /* Color Palette */
+    --bg-deep: #050508;
+    --bg-card: rgba(15, 15, 25, 0.7);
+    --accent-primary: #6366f1;
+    /* Indigo */
+    --accent-secondary: #a855f7;
+    /* Purple */
+    --accent-cyan: #06b6d4;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-bg: rgba(20, 20, 30, 0.6);
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    font-family: 'Outfit', sans-serif;
+    overflow-x: hidden;
+}
+
+/* Background Dynamic Graphics */
+body::before {
+    content: "";
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 20% 30%, rgba(168, 85, 247, 0.05) 0%, transparent 40%);
+    animation: bg-move 20s infinite alternate ease-in-out;
+    z-index: -1;
+}
+
+@keyframes bg-move {
+    from {
+        transform: translate(0, 0) rotate(0deg);
+    }
+
+    to {
+        transform: translate(5%, 5%) rotate(5deg);
+    }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+/* Layout Structure */
+.page {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 320px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 100;
+}
+
+main {
+    flex: 1;
+    padding: 3rem 4rem;
+    max-width: 1400px;
+    margin: 0;
+    width: 100%;
+}
+
+/* Components: Glass Cards */
+.glass-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    transition: var(--transition-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-primary);
+    box-shadow: 0 15px 40px rgba(99, 102, 241, 0.15);
+}
+
+.glass-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transition: 0.5s;
+}
+
+.glass-card:hover::after {
+    left: 100%;
+}
+
+/* Typography */
+h1,
+h2,
+h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+}
+
+.logo {
+    font-size: 2.2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding: 3rem 2rem;
+    text-align: center;
+    letter-spacing: 4px;
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+}
+
+.shimmer {
+    background: linear-gradient(to right,
+            var(--accent-primary) 20%,
+            var(--accent-cyan) 40%,
+            var(--accent-cyan) 60%,
+            var(--accent-primary) 80%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+    to {
+        background-position: 200% center;
+    }
+}
+
+/* Nav Link Styling */
+.nav-link {
+    color: var(--text-muted);
+    padding: 1rem 2rem;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: var(--transition-smooth);
+    border-left: 3px solid transparent;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: var(--accent-primary);
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+}
+
+.btn-primary:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+}
+
+/* Animations */
+.animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pulse-accent {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+}
+
+/* Modules View */
+.module-container {
+    display: grid;
+    gap: 2rem;
+}
+
+.markdown-content {
+    line-height: 1.7;
+    color: #e2e8f0;
+}
+
+.markdown-content p {
+    margin-bottom: 1.2rem;
+}
+
+.markdown-content code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    color: var(--accent-cyan);
+}
+
+/* Stat Badges */
+.stat-badge {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Auth Pages */
+.auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+}

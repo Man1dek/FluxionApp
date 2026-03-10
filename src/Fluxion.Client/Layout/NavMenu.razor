@@ -1,0 +1,7 @@
+﻿@* NavMenu is now embedded in MainLayout header — this component is kept for compatibility *@
+
+@code {
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private void ToggleNavMenu() { collapseNavMenu = !collapseNavMenu; }
+}

@@ -1,0 +1,65 @@
+@page "/progress"
+@using Fluxion.Core.Models
+@inject HttpClient Http
+
+<PageTitle>Knowledge Graph — Fluxion</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1 class="heading-xl text-gradient">Knowledge Graph</h1>
+        <p class="text-dim mt-sm">Your personalized path through the curriculum topology</p>
+    </div>
+</div>
+
+@if (_nodes == null)
+{
+    <div class="text-center" style="padding:4rem 0;">
+        <div class="spinner mb-lg"></div>
+        <p class="text-dim">Loading curriculum map…</p>
+    </div>
+}
+else
+{
+    <div class="graph-grid">
+        @foreach (var node in _nodes.OrderBy(n => n.DifficultyLevel))
+        {
+            var mastery = _mastery.GetValueOrDefault(node.Id, 0.0);
+            var isMastered = mastery >= node.MasteryThreshold;
+            
+            <div class="glass-card graph-node @(isMastered ? "mastered" : "")">
+                <div class="node-title">@node.Title</div>
+                <div class="node-level">
+                    <span class="tag tag-accent" style="padding:0.2rem 0.6rem; font-size:0.65rem;">Level @node.DifficultyLevel</span>
+                    @if (isMastered)
+                    {
+                        <span class="tag" style="padding:0.2rem 0.6rem; font-size:0.65rem; background:rgba(16,185,129,0.06); color:var(--emerald); border:1px solid rgba(16,185,129,0.15);">✓ Mastered</span>
+                    }
+                </div>
+                @if (mastery > 0)
+                {
+                    <div class="mastery-bar">
+                        <div class="fill" style="width: @(mastery * 100)%"></div>
+                    </div>
+                }
+                else
+                {
+                    <div class="mastery-bar">
+                        <div class="fill" style="width: 0%"></div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<KnowledgeNode>? _nodes;
+    private Dictionary<Guid, double> _mastery = new();
+    
+    private Guid _mockLearnerId = Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _nodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
+    }
+}

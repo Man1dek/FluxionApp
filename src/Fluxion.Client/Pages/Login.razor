@@ -1,0 +1,93 @@
+@page "/login"
+@using Fluxion.Client.Services
+@using Fluxion.Core.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<PageTitle>Sign In — Fluxion</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-visual">
+        <div class="auth-visual-content">
+            <div class="logo">FLUXION</div>
+            <div class="logo-sub">Kinetic Curriculum Engine</div>
+            <div class="auth-visual-tagline">
+                Where AI meets your curiosity.
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-form-side">
+        <div class="auth-card">
+            <h2 class="heading-lg mb-sm">Welcome back</h2>
+            <p class="text-dim mb-xl" style="font-size:0.92rem;">Resume your AI-orchestrated learning journey.</p>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert-error">
+                    <span>⚠️</span> @_error
+                </div>
+            }
+
+            <div class="form-group">
+                <label class="label">Username</label>
+                <input @bind="_loginModel.Username" 
+                       class="input" 
+                       placeholder="Enter your learner ID" />
+            </div>
+
+            <div class="form-group">
+                <label class="label">Password</label>
+                <input @bind="_loginModel.Password" 
+                       type="password" 
+                       class="input" 
+                       placeholder="••••••••" />
+            </div>
+
+            <div class="mt-xl mb-lg">
+                <button class="btn btn-primary w-full" @onclick="HandleLogin" disabled="@_isProcessing">
+                    @(_isProcessing ? "Authenticating…" : "Sign In →")
+                </button>
+            </div>
+
+            <p class="text-center text-dim" style="font-size:0.85rem;">
+                New to the ecosystem? <a href="/register" class="auth-link">Create Account</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel _loginModel = new();
+    private bool _isProcessing = false;
+    private string? _error;
+
+    private async Task HandleLogin()
+    {
+        _isProcessing = true;
+        _error = null;
+
+        var response = await Http.PostAsJsonAsync("api/auth/login", _loginModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<AuthResponseDTO>();
+            await LocalStorage.SetItemAsync("authToken", result!.Token);
+            await LocalStorage.SetItemAsync("learnerId", result.LearnerId);
+            
+            ((FluxionAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(result.Token);
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            _error = "Invalid username or password.";
+        }
+
+        _isProcessing = false;
+    }
+
+    public class LoginModel { public string Username { get; set; } = ""; public string Password { get; set; } = ""; }
+    public record AuthResponseDTO(string Token, string Username, Guid LearnerId);
+}

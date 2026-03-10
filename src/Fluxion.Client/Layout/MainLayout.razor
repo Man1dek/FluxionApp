@@ -1,0 +1,86 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject IJSRuntime JS
+
+<div class="page">
+    <header class="site-header">
+        <div class="header-left">
+            <a href="/" class="header-logo">
+                FLUXION <span class="logo-dot"></span>
+            </a>
+
+            <AuthorizeView>
+                <Authorized>
+                    <nav class="header-nav">
+                        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                            <span class="nav-icon">⚡</span> Dashboard
+                        </NavLink>
+                        <NavLink class="nav-link" href="progress">
+                            <span class="nav-icon">🗺️</span> Progress
+                        </NavLink>
+                    </nav>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        <div class="header-actions">
+            <AuthorizeView>
+                <Authorized>
+                    <button class="btn btn-outline btn-sm" @onclick="Logout">Sign Out</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login" class="btn btn-outline btn-sm" style="text-decoration:none;">Sign In</a>
+                    <a href="register" class="btn btn-primary btn-sm" style="text-decoration:none;">Get Started</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </header>
+
+    <main>
+        <div class="content-wrapper">
+            @Body
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <span class="footer-brand">FLUXION</span>
+        <span>v1.0 · AI-Powered Adaptive Learning</span>
+    </footer>
+</div>
+
+@code {
+    [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private Blazored.LocalStorage.ILocalStorageService LocalStorage { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("window.initializeKinetic");
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // Fire and forget JS initialization on navigation
+        _ = JS.InvokeVoidAsync("window.initializeKinetic");
+    }
+
+    private async Task Logout()
+    {
+        await LocalStorage.RemoveItemAsync("authToken");
+        ((Fluxion.Client.Services.FluxionAuthStateProvider)AuthStateProvider).NotifyUserLogout();
+        Navigation.NavigateTo("login");
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

@@ -1,0 +1,84 @@
+@page "/register"
+@using Fluxion.Client.Services
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Create Account — Fluxion</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-visual">
+        <div class="auth-visual-content">
+            <div class="logo">FLUXION</div>
+            <div class="logo-sub">Kinetic Curriculum Engine</div>
+            <div class="auth-visual-tagline">
+                Initialize your personalized learning path.
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-form-side">
+        <div class="auth-card">
+            <h2 class="heading-lg mb-sm">Create your profile</h2>
+            <p class="text-dim mb-xl" style="font-size:0.92rem;">Start your personalized learning journey today.</p>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert-error">
+                    <span>⚠️</span> @_error
+                </div>
+            }
+
+            <div class="form-group">
+                <label class="label">Username</label>
+                <input @bind="_regModel.Username" 
+                       class="input" 
+                       placeholder="Choose a unique learner ID" />
+            </div>
+
+            <div class="form-group">
+                <label class="label">Password</label>
+                <input @bind="_regModel.Password" 
+                       type="password" 
+                       class="input" 
+                       placeholder="Create a secure password" />
+            </div>
+
+            <div class="mt-xl mb-lg">
+                <button class="btn btn-primary w-full" @onclick="HandleRegister" disabled="@_isProcessing">
+                    @(_isProcessing ? "Building Neural Path…" : "Create Account →")
+                </button>
+            </div>
+
+            <p class="text-center text-dim" style="font-size:0.85rem;">
+                Already have an account? <a href="/login" class="auth-link">Sign In</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterModel _regModel = new();
+    private bool _isProcessing = false;
+    private string? _error;
+
+    private async Task HandleRegister()
+    {
+        _isProcessing = true;
+        _error = null;
+
+        var response = await Http.PostAsJsonAsync("api/auth/register", _regModel);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            _error = "Username already taken or registration failed.";
+        }
+
+        _isProcessing = false;
+    }
+
+    public class RegisterModel { public string Username { get; set; } = ""; public string Password { get; set; } = ""; }
+}
