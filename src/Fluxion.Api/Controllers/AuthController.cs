@@ -68,7 +68,10 @@ public class AuthController : ControllerBase
 
     private string GenerateJwtToken(ApplicationUser user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"] ?? "SUPER_SECRET_FLUXION_KEY_32_CHARS_LONG"));
+        var jwtKey = _config["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "Missing required configuration: Jwt:Key.");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -82,7 +85,7 @@ public class AuthController : ControllerBase
             issuer: _config["Jwt:Issuer"] ?? "Fluxion",
             audience: _config["Jwt:Audience"] ?? "FluxionLearners",
             claims: claims,
-            expires: DateTime.Now.AddDays(7),
+            expires: DateTime.UtcNow.AddDays(7),
             signingCredentials: creds
         );
 

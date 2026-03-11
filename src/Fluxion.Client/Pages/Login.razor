@@ -69,20 +69,28 @@
         _isProcessing = true;
         _error = null;
 
-        var response = await Http.PostAsJsonAsync("api/auth/login", _loginModel);
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", _loginModel);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var result = await response.Content.ReadFromJsonAsync<AuthResponseDTO>();
-            await LocalStorage.SetItemAsync("authToken", result!.Token);
-            await LocalStorage.SetItemAsync("learnerId", result.LearnerId);
-            
-            ((FluxionAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(result.Token);
-            Navigation.NavigateTo("/");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<AuthResponseDTO>();
+                await LocalStorage.SetItemAsync("authToken", result!.Token);
+                await LocalStorage.SetItemAsync("learnerId", result.LearnerId);
+                
+                ((FluxionAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(result.Token);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _error = $"Login failed ({(int)response.StatusCode}): {body}";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _error = "Invalid username or password.";
+            _error = $"Connection error: {ex.Message}";
         }
 
         _isProcessing = false;

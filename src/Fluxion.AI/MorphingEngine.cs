@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Fluxion.Core.Interfaces;
 using Fluxion.Core.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Polly;
 using Polly.Retry;
@@ -22,16 +23,19 @@ public class MorphingEngine
     private readonly Kernel _kernel;
     private readonly IKnowledgeGraphRepository _graph;
     private readonly CognitiveLoadAnalyzer _cognitiveAnalyzer;
+    private readonly ILogger<MorphingEngine> _logger;
     private readonly AsyncRetryPolicy _retryPolicy;
 
     public MorphingEngine(
         Kernel kernel,
         IKnowledgeGraphRepository graph,
-        CognitiveLoadAnalyzer cognitiveAnalyzer)
+        CognitiveLoadAnalyzer cognitiveAnalyzer,
+        ILogger<MorphingEngine> logger)
     {
         _kernel = kernel;
         _graph = graph;
         _cognitiveAnalyzer = cognitiveAnalyzer;
+        _logger = logger;
 
         // Exponential backoff: retry 3 times (2s, 4s, 8s) on transient AI errors
         _retryPolicy = Policy
@@ -43,8 +47,9 @@ public class MorphingEngine
     /// Generates the next morphed module for a learner.
     /// This is the primary orchestration entry point.
     /// </summary>
-    public async Task<MorphedModule> MorphNextModuleAsync(Guid learnerId)
+    public async Task<MorphedModule> MorphNextModuleAsync(Guid learnerId, Func<string, Task>? onProgress = null)
     {
+        if (onProgress != null) await onProgress("Analyzing mastery trend and cognitive profile...");
         var learner = await _graph.GetLearnerAsync(learnerId)
             ?? throw new ArgumentException($"Learner {learnerId} not found");
 
@@ -57,6 +62,7 @@ public class MorphingEngine
         learner.CognitiveLoadIndex = _cognitiveAnalyzer.Calculate(recentSessions);
 
         // Step 2: Get candidate next nodes from the graph
+        if (onProgress != null) await onProgress("Selecting optimal next concept in curriculum topology...");
         var candidates = await _graph.GetNextCandidatesAsync(learner.GetMasteryDict());
 
         if (candidates.Count == 0)
@@ -71,8 +77,8 @@ public class MorphingEngine
             };
         }
 
-        // Step 3: Ask the AI to recommend the best next node
-        var selectedNode = await SelectBestNodeAsync(candidates, learner);
+        // Step 3: Select the best next node
+        var selectedNode = SelectBestNode(candidates, learner);
 
         // Step 4: Calculate adjusted difficulty
         var adjustedDifficulty = CalculateAdjustedDifficulty(
@@ -83,6 +89,7 @@ public class MorphingEngine
             learner.CognitiveLoadIndex, learner.PreferredFormat);
 
         // Step 6: Generate the module content using Semantic Kernel
+        if (onProgress != null) await onProgress($"Generating kinetic {selectedFormat} content for '{selectedNode.Title}'...");
         var content = await GenerateContentAsync(
             selectedNode, adjustedDifficulty, selectedFormat, learner);
 
@@ -123,8 +130,8 @@ public class MorphingEngine
             response,
             node.Description);
 
-        // Parse the mastery score from AI response
-        var masteryScore = ParseMasteryScore(evaluationJson);
+        // Parse the mastery score and feedback from AI response
+        var (masteryScore, feedbackText) = ParseEvaluationDetails(evaluationJson);
 
         // Record the session
         var session = new SessionRecord
@@ -143,7 +150,7 @@ public class MorphingEngine
         return new StudentFeedback
         {
             MasteryScore = masteryScore,
-            EvaluationDetails = evaluationJson,
+            EvaluationDetails = feedbackText,
             NodeMastered = masteryScore >= node.MasteryThreshold,
             NodeTitle = node.Title
         };
@@ -185,41 +192,14 @@ public class MorphingEngine
         return Math.Clamp(baseDifficulty + adjustment, 1, 10);
     }
 
-    private async Task<KnowledgeNode> SelectBestNodeAsync(
+    private KnowledgeNode SelectBestNode(
         IReadOnlyList<KnowledgeNode> candidates, LearnerProfile learner)
     {
-        if (candidates.Count == 1)
-            return candidates[0];
-
-        try
-        {
-            // Ask AI for recommendation
-            var candidatesJson = JsonSerializer.Serialize(
-                candidates.Select(c => new { c.Title, c.DifficultyLevel }));
-
-            var masteryJson = JsonSerializer.Serialize(
-                learner.GetMasteryDict().ToDictionary(
-                    kvp => kvp.Key.ToString()[..8], kvp => kvp.Value));
-
-            var plugin = new Plugins.CurriculumPlugin();
-            var recommendation = await _retryPolicy.ExecuteAsync(() => 
-                plugin.RecommendNextNodesAsync(_kernel, candidatesJson, masteryJson, learner.CognitiveLoadIndex));
-
-            // Try to match the first recommended title to a candidate
-            foreach (var candidate in candidates)
-            {
-                if (recommendation.Contains(candidate.Title, StringComparison.OrdinalIgnoreCase))
-                    return candidate;
-            }
-        }
-        catch
-        {
-            // Fallback to heuristic if AI fails
-        }
-
         // Heuristic fallback: pick the lowest-difficulty unmastered candidate
+        // To save latency, we'll often prefer this over an extra AI call for selection
         return candidates
-            .OrderBy(c => Math.Abs(c.DifficultyLevel - GetAverageMastery(learner) * 10))
+            .OrderBy(c => c.DifficultyLevel)
+            .ThenBy(c => c.Title)
             .First();
     }
 
@@ -261,16 +241,39 @@ public class MorphingEngine
         }
     }
 
-    private static double ParseMasteryScore(string evaluationJson)
+    private (double masteryScore, string feedback) ParseEvaluationDetails(string evaluationJson)
     {
+        double score = 0.5;
+        string feedback = "Evaluation recorded.";
         try
         {
-            using var doc = JsonDocument.Parse(evaluationJson);
+            // Remove any markdown code blocks the AI might have wrapped the JSON in
+            var cleanJson = evaluationJson.Trim();
+            if (cleanJson.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
+                cleanJson = cleanJson[7..];
+            if (cleanJson.StartsWith("```", StringComparison.OrdinalIgnoreCase))
+                cleanJson = cleanJson[3..];
+            if (cleanJson.EndsWith("```", StringComparison.OrdinalIgnoreCase))
+                cleanJson = cleanJson[..^3];
+
+            using var doc = JsonDocument.Parse(cleanJson.Trim());
             if (doc.RootElement.TryGetProperty("masteryScore", out var scoreElement))
-                return Math.Clamp(scoreElement.GetDouble(), 0.0, 1.0);
+            {
+                if (scoreElement.ValueKind == JsonValueKind.Number)
+                    score = Math.Clamp(scoreElement.GetDouble(), 0.0, 1.0);
+            }
+            if (doc.RootElement.TryGetProperty("feedback", out var feedbackElement))
+            {
+                if (feedbackElement.ValueKind == JsonValueKind.String)
+                    feedback = feedbackElement.GetString() ?? feedback;
+            }
         }
-        catch { }
-        return 0.5; // Default to moderate if parsing fails
+        catch (Exception ex)
+        {
+            // Log but don't crash — return defaults
+            _logger.LogWarning(ex, "Failed to parse AI evaluation JSON: {Json}", evaluationJson);
+        }
+        return (score, feedback);
     }
 
     private static List<string> ExtractPracticeQuestions(string content)

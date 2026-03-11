@@ -89,9 +89,13 @@ public class CurriculumController : ControllerBase
     {
         try
         {
-            var module = await _morphingEngine.MorphNextModuleAsync(learnerId);
+            var module = await _morphingEngine.MorphNextModuleAsync(learnerId, async (status) => 
+            {
+                await _hubContext.Clients.Group(learnerId.ToString())
+                    .SendAsync("OrchestrationProgress", status);
+            });
 
-            // Push real-time update to the learner's SignalR connection
+            // Push final real-time update
             await _hubContext.Clients.Group(learnerId.ToString())
                 .SendAsync("ModuleMorphed", module);
 

@@ -25,9 +25,12 @@ public class FluxionAuthStateProvider : AuthenticationStateProvider
         var token = await _localStorage.GetItemAsync<string>("authToken");
 
         if (string.IsNullOrWhiteSpace(token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = null;
             return _anonymous;
+        }
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("bearer", token);
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         return new AuthenticationState(new ClaimsPrincipal(
             new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
@@ -35,6 +38,9 @@ public class FluxionAuthStateProvider : AuthenticationStateProvider
 
     public void NotifyUserAuthentication(string token)
     {
+        // Immediately set the auth header so subsequent HTTP calls include the token
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
         var authenticatedUser = new ClaimsPrincipal(
             new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
         var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
@@ -43,6 +49,7 @@ public class FluxionAuthStateProvider : AuthenticationStateProvider
 
     public void NotifyUserLogout()
     {
+        _httpClient.DefaultRequestHeaders.Authorization = null;
         var authState = Task.FromResult(_anonymous);
         NotifyAuthenticationStateChanged(authState);
     }

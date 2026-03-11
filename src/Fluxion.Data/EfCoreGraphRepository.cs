@@ -77,12 +77,44 @@ public class EfCoreGraphRepository : IKnowledgeGraphRepository
     public async Task<IReadOnlyList<KnowledgeNode>> GetNextCandidatesAsync(
         Dictionary<Guid, double> currentMastery)
     {
-        var allNodes = await _context.Nodes.ToListAsync();
-        var allEdges = await _context.Edges.ToListAsync();
+        // Get IDs of nodes that the learner has already mastered
+        var masteredNodeIds = currentMastery
+            .Where(kvp => kvp.Value >= 0.7) // default threshold; refined below
+            .Select(kvp => kvp.Key)
+            .ToHashSet();
 
-        return allNodes
-            .Where(node => !IsMastered(node.Id, currentMastery, node.MasteryThreshold))
-            .Where(node => AllPrerequisitesMastered(node.Id, allEdges, currentMastery, allNodes))
+        // Pull only unmastered nodes from the database
+        var unmasteredNodes = await _context.Nodes
+            .Where(n => !masteredNodeIds.Contains(n.Id))
+            .ToListAsync();
+
+        // Further filter: only keep nodes whose mastery is actually below their specific threshold
+        unmasteredNodes = unmasteredNodes
+            .Where(n => !IsMastered(n.Id, currentMastery, n.MasteryThreshold))
+            .ToList();
+
+        if (unmasteredNodes.Count == 0)
+            return unmasteredNodes;
+
+        // Pull only prerequisite edges for the unmastered nodes
+        var unmasteredNodeIds = unmasteredNodes.Select(n => n.Id).ToList();
+        var prerequisiteEdges = await _context.Edges
+            .Where(e => unmasteredNodeIds.Contains(e.TargetNodeId) 
+                     && e.Relation == EdgeRelation.PrerequisiteOf)
+            .ToListAsync();
+
+        // Filter to nodes whose prerequisites are all mastered
+        return unmasteredNodes
+            .Where(node =>
+            {
+                var prereqs = prerequisiteEdges
+                    .Where(e => e.TargetNodeId == node.Id)
+                    .ToList();
+
+                return prereqs.All(edge =>
+                    currentMastery.TryGetValue(edge.SourceNodeId, out var score)
+                    && score >= (unmasteredNodes.FirstOrDefault(n => n.Id == edge.SourceNodeId)?.MasteryThreshold ?? 0.7));
+            })
             .ToList();
     }
 
@@ -137,10 +169,50 @@ public class EfCoreGraphRepository : IKnowledgeGraphRepository
     public async Task<IReadOnlyList<KnowledgeNode>> GetLearningPathAsync(
         Guid targetNodeId, Dictionary<Guid, double> currentMastery)
     {
-        // For the demo/MVP, we use the same candidate selection logic
-        // In a real production app, this would be a full A* or Dijkstra traversal
-        var nodes = await GetAllNodesAsync();
-        return nodes.Take(3).ToList(); // Simplified placeholder for shortest path
+        // BFS backwards from the target node through prerequisite edges,
+        // collecting all unmastered nodes in the dependency chain.
+        var allNodes = await _context.Nodes.ToDictionaryAsync(n => n.Id);
+        var allEdges = await _context.Edges
+            .Where(e => e.Relation == EdgeRelation.PrerequisiteOf)
+            .ToListAsync();
+
+        var visited = new HashSet<Guid>();
+        var queue = new Queue<Guid>();
+        var path = new List<KnowledgeNode>();
+
+        queue.Enqueue(targetNodeId);
+        visited.Add(targetNodeId);
+
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+
+            if (!allNodes.TryGetValue(currentId, out var currentNode))
+                continue;
+
+            // Add to path if not yet mastered
+            if (!IsMastered(currentId, currentMastery, currentNode.MasteryThreshold))
+            {
+                path.Add(currentNode);
+            }
+
+            // Walk backwards through prerequisite edges
+            var prereqSourceIds = allEdges
+                .Where(e => e.TargetNodeId == currentId)
+                .Select(e => e.SourceNodeId);
+
+            foreach (var prereqId in prereqSourceIds)
+            {
+                if (visited.Add(prereqId))
+                {
+                    queue.Enqueue(prereqId);
+                }
+            }
+        }
+
+        // Reverse so prerequisites come first (topological order)
+        path.Reverse();
+        return path;
     }
 
     // ── Helpers ─────────────────────────────────────────────
@@ -148,25 +220,5 @@ public class EfCoreGraphRepository : IKnowledgeGraphRepository
     private static bool IsMastered(Guid nodeId, Dictionary<Guid, double> mastery, double threshold)
     {
         return mastery.TryGetValue(nodeId, out var score) && score >= threshold;
-    }
-
-    private static bool AllPrerequisitesMastered(
-        Guid nodeId, 
-        List<KnowledgeEdge> edges, 
-        Dictionary<Guid, double> mastery,
-        List<KnowledgeNode> nodes)
-    {
-        var prereqs = edges
-            .Where(e => e.TargetNodeId == nodeId && e.Relation == EdgeRelation.PrerequisiteOf)
-            .ToList();
-
-        foreach (var edge in prereqs)
-        {
-            var prereqNode = nodes.First(n => n.Id == edge.SourceNodeId);
-            if (!IsMastered(edge.SourceNodeId, mastery, prereqNode.MasteryThreshold))
-                return false;
-        }
-
-        return true;
     }
 }

@@ -66,15 +66,23 @@
         _isProcessing = true;
         _error = null;
 
-        var response = await Http.PostAsJsonAsync("api/auth/register", _regModel);
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/register", _regModel);
 
-        if (response.IsSuccessStatusCode)
-        {
-            Navigation.NavigateTo("/login");
+            if (response.IsSuccessStatusCode)
+            {
+                Navigation.NavigateTo("/login");
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _error = $"Registration failed ({(int)response.StatusCode}): {body}";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _error = "Username already taken or registration failed.";
+            _error = $"Connection error: {ex.Message}";
         }
 
         _isProcessing = false;

@@ -1,6 +1,7 @@
 @page "/progress"
 @using Fluxion.Core.Models
 @inject HttpClient Http
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
 <PageTitle>Knowledge Graph — Fluxion</PageTitle>
 
@@ -55,11 +56,28 @@ else
 @code {
     private List<KnowledgeNode>? _nodes;
     private Dictionary<Guid, double> _mastery = new();
-    
+    private string? _error;
+
     private Guid _mockLearnerId = Guid.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        _nodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
+        try
+        {
+            // Ensure the HttpClient has the Bearer token
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = 
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            _nodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not load knowledge graph: {ex.Message}";
+            _nodes = new List<KnowledgeNode>();
+        }
     }
 }

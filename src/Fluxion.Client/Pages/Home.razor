@@ -4,176 +4,191 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 @implements IAsyncDisposable
 
 <PageTitle>Fluxion — AI-Powered Learning</PageTitle>
 
-@if (_hasError)
-{
-    <!-- Unauthenticated / Error State — Premium Landing Page -->
-    <section class="hero-section">
-        <h1 class="hero-title">
-            The future of <span class="accent-word">adaptive</span> learning
-        </h1>
-        <p class="hero-subtitle">
-            An AI-powered engine that morphs content in real-time based on your 
-            cognitive profile. Personalized curriculum, reimagined.
-        </p>
-        <div class="hero-actions">
-            <a href="/login" class="btn btn-primary" style="text-decoration:none;">Sign In →</a>
-            <a href="/register" class="btn btn-outline" style="text-decoration:none;">Create Account</a>
-        </div>
-    </section>
+<AuthorizeView>
+    <NotAuthorized>
+        @* ── Unauthenticated Landing Page ── *@
+        <section class="hero-section">
+            <h1 class="hero-title">
+                The future of <span class="accent-word">adaptive</span> learning
+            </h1>
+            <p class="hero-subtitle">
+                An AI-powered engine that morphs content in real-time based on your 
+                cognitive profile. Personalized curriculum, reimagined.
+            </p>
+            <div class="hero-actions">
+                <a href="/login" class="btn btn-primary" style="text-decoration:none;">Sign In →</a>
+                <a href="/register" class="btn btn-outline" style="text-decoration:none;">Create Account</a>
+            </div>
+        </section>
 
-    <div class="bento-grid" style="max-width:920px; margin:0 auto; padding:0 2.5rem;">
-        <div class="bento-card">
-            <div class="bento-icon">🧠</div>
-            <h4>Adaptive Content</h4>
-            <p>AI analyzes your cognitive load in real-time to morph lessons to your exact level and learning style.</p>
-        </div>
-        <div class="bento-card">
-            <div class="bento-icon">📊</div>
-            <h4>Mastery Tracking</h4>
-            <p>Progress through a knowledge graph — unlock new concepts as you master fundamentals.</p>
-        </div>
-        <div class="bento-card">
-            <div class="bento-icon">⚡</div>
-            <h4>Active Recall</h4>
-            <p>Practice exercises evaluated by AI with instant feedback and precision mastery scoring.</p>
-        </div>
-    </div>
-
-    <div class="proof-section" style="max-width:920px; margin:0 auto;">
-        <div class="section-label">Built with purpose</div>
-        <div class="proof-quote">
-            "Learning should feel like a conversation, not a lecture.
-            Fluxion makes that possible."
-        </div>
-        <div class="proof-attribution">The Fluxion Team</div>
-    </div>
-
-    <div class="cta-section">
-        <h2>Ready to transform how you learn?</h2>
-        <p>Start your AI-orchestrated journey today. No credit card required.</p>
-        <div class="hero-actions">
-            <a href="/register" class="btn btn-primary" style="text-decoration:none;">Get Started →</a>
-        </div>
-    </div>
-}
-else
-{
-    <div class="page-header">
-        <div>
-            <h1 class="heading-xl text-shimmer">Kinetic Curriculum</h1>
-            <p class="text-dim mt-sm">AI-orchestrated adaptive learning environment</p>
-        </div>
-        <div class="flex gap-md items-center">
-            @if (_learner != null)
-            {
-                <div class="stat-badge">
-                   <span>🧠</span> @(_learner.CognitiveLoadIndex.ToString("P0")) Load
-                </div>
-                <div class="stat-badge">
-                   <span>🎯</span> @(_learner.MasteryEntries.Count(m => m.MasteryScore >= 0.7)) / @_totalNodes Mastered
-                </div>
-            }
-        </div>
-    </div>
-
-    @if (_isLoading)
-    {
-        <div class="glass-card module-card text-center" style="padding:4rem 2rem;">
-            <div class="spinner mb-lg"></div>
-            <h2 class="heading-md text-gradient mb-sm">Orchestrating Next Module…</h2>
-            <p class="text-dim">Analyzing your cognitive profile and preparing content.</p>
-            <div class="flex gap-sm items-center mt-xl" style="justify-content:center;">
-                <div class="skeleton" style="width:200px; height:14px;"></div>
-                <div class="skeleton" style="width:160px; height:14px;"></div>
-                <div class="skeleton" style="width:120px; height:14px;"></div>
+        <div class="bento-grid" style="max-width:920px; margin:0 auto; padding:0 2.5rem;">
+            <div class="bento-card">
+                <div class="bento-icon">🧠</div>
+                <h4>Adaptive Content</h4>
+                <p>AI analyzes your cognitive load in real-time to morph lessons to your exact level and learning style.</p>
+            </div>
+            <div class="bento-card">
+                <div class="bento-icon">📊</div>
+                <h4>Mastery Tracking</h4>
+                <p>Progress through a knowledge graph — unlock new concepts as you master fundamentals.</p>
+            </div>
+            <div class="bento-card">
+                <div class="bento-icon">⚡</div>
+                <h4>Active Recall</h4>
+                <p>Practice exercises evaluated by AI with instant feedback and precision mastery scoring.</p>
             </div>
         </div>
-    }
-    else if (_currentModule != null)
-    {
-        <div class="glass-card module-card">
-            <div class="module-meta">
-                <span class="tag tag-pink">@_currentModule.SelectedFormat</span>
-                <div class="difficulty-indicator">
-                    @for (int i = 1; i <= 10; i++)
-                    {
-                        <span class="diff-dot @(i <= _currentModule.AdjustedDifficulty ? "active" : "")"></span>
-                    }
-                </div>
-                <span class="tag tag-accent">Level @_currentModule.AdjustedDifficulty</span>
+
+        <div class="proof-section" style="max-width:920px; margin:0 auto;">
+            <div class="section-label">Built with purpose</div>
+            <div class="proof-quote">
+                "Learning should feel like a conversation, not a lecture.
+                Fluxion makes that possible."
             </div>
-            
-            <h2 class="heading-lg text-gradient mb-lg">@_currentModule.NodeTitle</h2>
+            <div class="proof-attribution">The Fluxion Team</div>
+        </div>
 
-            @if (!string.IsNullOrEmpty(_currentModule.MorphingRationale))
-            {
-                <div class="ai-rationale">
-                    <div class="label">AI Morphing Logic</div>
-                    <p class="text-dim" style="margin:0; font-size:0.88rem;">@_currentModule.MorphingRationale</p>
-                </div>
-            }
-
-            <div class="md-content mb-xl">
-                @((MarkupString)Markdig.Markdown.ToHtml(_currentModule.Content))
+        <div class="cta-section">
+            <h2>Ready to transform how you learn?</h2>
+            <p>Start your AI-orchestrated journey today. No credit card required.</p>
+            <div class="hero-actions">
+                <a href="/register" class="btn btn-primary" style="text-decoration:none;">Get Started →</a>
             </div>
+        </div>
+    </NotAuthorized>
 
-            <div class="practice-section">
-                <h3 class="heading-md mb-lg flex items-center gap-sm">
-                    <span>✍️</span> Active Recall
-                </h3>
-                
-                @if (_currentModule.PracticeQuestions.Any())
+    <Authorized>
+        @* ── Authenticated Dashboard ── *@
+        <div class="page-header">
+            <div>
+                <h1 class="heading-xl text-shimmer">Kinetic Curriculum</h1>
+                <p class="text-dim mt-sm">AI-orchestrated adaptive learning environment</p>
+            </div>
+            <div class="flex gap-md items-center">
+                @if (_learner != null)
                 {
-                    <div class="mb-lg">
-                        @foreach (var q in _currentModule.PracticeQuestions)
+                    <div class="stat-badge">
+                       <span>🧠</span> @(_learner.CognitiveLoadIndex.ToString("P0")) Load
+                    </div>
+                    <div class="stat-badge">
+                       <span>🎯</span> @(_learner.MasteryEntries.Count(m => m.MasteryScore >= 0.7)) / @_totalNodes Mastered
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="glass-card module-card" style="padding:2rem;">
+                <div class="alert-error">
+                    <span>⚠️</span> @_errorMessage
+                </div>
+                <button class="btn btn-primary mt-lg" @onclick="RetryLoad">Retry →</button>
+            </div>
+        }
+        else if (_isLoading)
+        {
+            <div class="glass-card module-card text-center" style="padding:4rem 2rem;">
+                <div class="spinner mb-lg"></div>
+                <h2 class="heading-md text-gradient mb-sm">Orchestrating Next Module…</h2>
+                <p class="text-dim">@(_loadingStatus ?? "Analyzing your cognitive profile and preparing content.")</p>
+                <div class="flex gap-sm items-center mt-xl" style="justify-content:center;">
+                    <div class="skeleton" style="width:200px; height:14px;"></div>
+                    <div class="skeleton" style="width:160px; height:14px;"></div>
+                    <div class="skeleton" style="width:120px; height:14px;"></div>
+                </div>
+            </div>
+        }
+        else if (_currentModule != null)
+        {
+            <div class="glass-card module-card">
+                <div class="module-meta">
+                    <span class="tag tag-pink">@_currentModule.SelectedFormat</span>
+                    <div class="difficulty-indicator">
+                        @for (int i = 1; i <= 10; i++)
                         {
-                            <div class="question-item">@q</div>
+                            <span class="diff-dot @(i <= _currentModule.AdjustedDifficulty ? "active" : "")"></span>
                         }
+                    </div>
+                    <span class="tag tag-accent">Level @_currentModule.AdjustedDifficulty</span>
+                </div>
+                
+                <h2 class="heading-lg text-gradient mb-lg">@_currentModule.NodeTitle</h2>
+
+                @if (!string.IsNullOrEmpty(_currentModule.MorphingRationale))
+                {
+                    <div class="ai-rationale">
+                        <div class="label">AI Morphing Logic</div>
+                        <p class="text-dim" style="margin:0; font-size:0.88rem;">@_currentModule.MorphingRationale</p>
                     </div>
                 }
 
-                <div class="mb-lg">
-                    <textarea @bind="_studentResponse" 
-                              placeholder="Describe your understanding or provide the solution…" 
-                              class="input"></textarea>
+                <div class="md-content mb-xl">
+                    @((MarkupString)SanitizeHtml(Markdig.Markdown.ToHtml(_currentModule.Content)))
                 </div>
 
-                <div class="text-right">
-                    <button class="btn btn-primary" 
-                            @onclick="SubmitResponse" 
-                            disabled="@(_isSubmitting || string.IsNullOrWhiteSpace(_studentResponse))">
-                        @(_isSubmitting ? "Evaluating…" : "Submit to AI Engine →")
-                    </button>
+                <div class="practice-section">
+                    <h3 class="heading-md mb-lg flex items-center gap-sm">
+                        <span>✍️</span> Active Recall
+                    </h3>
+                    
+                    @if (_currentModule.PracticeQuestions.Any())
+                    {
+                        <div class="mb-lg">
+                            @for (int i = 0; i < _currentModule.PracticeQuestions.Count; i++)
+                            {
+                                var q = _currentModule.PracticeQuestions[i];
+                                <div class="question-item">
+                                    @RenderQuestionWithBlanks(q, i)
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="mb-lg">
+                        <textarea @bind="_studentResponse" 
+                                  placeholder="Describe your understanding or provide the solution…" 
+                                  class="input"></textarea>
+                    </div>
+
+                    <div class="text-right">
+                        <button class="btn btn-primary" 
+                                @onclick="SubmitResponse" 
+                                disabled="@(_isSubmitting || string.IsNullOrWhiteSpace(_studentResponse))">
+                            @(_isSubmitting ? "Evaluating…" : "Submit to AI Engine →")
+                        </button>
+                    </div>
                 </div>
+
+                @if (_feedback != null)
+                {
+                    <div class="feedback-card @(_feedback.NodeMastered ? "success" : "warning")">
+                        <div class="score-ring">
+                            @((_feedback.MasteryScore * 100).ToString("F0"))%
+                        </div>
+                        <div style="flex:1;">
+                            <h4 class="heading-md mb-sm">@(_feedback.NodeMastered ? "Mastery Achieved!" : "Keep Going")</h4>
+                            <p class="text-dim mb-md" style="font-size:0.9rem;">@_feedback.EvaluationDetails</p>
+                            @if (_feedback.NodeMastered)
+                            {
+                                <button class="btn btn-success" @onclick="LoadNextModule">Next Module →</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline" @onclick="ClearFeedback">Try Again</button>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
-
-            @if (_feedback != null)
-            {
-                <div class="feedback-card @(_feedback.NodeMastered ? "success" : "warning")">
-                    <div class="score-ring">
-                        @((_feedback.MasteryScore * 100).ToString("F0"))%
-                    </div>
-                    <div style="flex:1;">
-                        <h4 class="heading-md mb-sm">@(_feedback.NodeMastered ? "Mastery Achieved!" : "Keep Going")</h4>
-                        <p class="text-dim mb-md" style="font-size:0.9rem;">@_feedback.EvaluationDetails</p>
-                        @if (_feedback.NodeMastered)
-                        {
-                            <button class="btn btn-success" @onclick="LoadNextModule">Next Module →</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-outline" @onclick="ClearFeedback">Try Again</button>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-    }
-}
+        }
+    </Authorized>
+</AuthorizeView>
 
 @code {
     private Guid _learnerId;
@@ -184,61 +199,151 @@ else
 
     private bool _isLoading = true;
     private bool _isSubmitting = false;
-    private bool _hasError = false;
+    private string? _errorMessage;
+    private string? _loadingStatus;
     private string _studentResponse = "";
     private DateTime _sessionStartTime;
     
     private Fluxion.Core.Models.StudentFeedback? _feedback;
+    private Dictionary<string, string> _inlineAnswers = new();
 
-    protected override async Task OnInitializedAsync()
+    private RenderFragment RenderQuestionWithBlanks(string question, int questionIndex) => builder =>
+    {
+        // detects sequences of 3 or more underscores
+        var regex = new System.Text.RegularExpressions.Regex(@"_{3,}");
+        var parts = regex.Split(question);
+        var matches = regex.Matches(question);
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            builder.AddContent(i * 2, parts[i]);
+            
+            if (i < matches.Count)
+            {
+                var inputKey = $"{questionIndex}_{i}";
+                if (!_inlineAnswers.ContainsKey(inputKey)) _inlineAnswers[inputKey] = "";
+
+                builder.OpenElement(i * 2 + 1, "input");
+                builder.AddAttribute(i * 2 + 2, "class", "inline-blank");
+                builder.AddAttribute(i * 2 + 3, "placeholder", "…");
+                builder.AddAttribute(i * 2 + 4, "value", Microsoft.AspNetCore.Components.BindConverter.FormatValue(_inlineAnswers[inputKey]));
+                builder.AddAttribute(i * 2 + 5, "oninput", Microsoft.AspNetCore.Components.EventCallback.Factory.CreateBinder(this, __value => _inlineAnswers[inputKey] = __value ?? "", _inlineAnswers[inputKey]));
+                builder.CloseElement();
+            }
+        }
+    };
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Check if user is authenticated
+        if (AuthState != null)
+        {
+            var state = await AuthState;
+            if (state.User.Identity?.IsAuthenticated == true)
+            {
+                await InitializeDashboard();
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task InitializeDashboard()
     {
         try
         {
-            _learnerId = Guid.NewGuid();
-            
-            var newLearnerReq = new { DisplayName = "Pioneer", PreferredFormat = ContentFormat.Interactive };
-            var created = await Http.PostAsJsonAsync("api/curriculum/learners", newLearnerReq);
+            // Yield to ensure local storage writes from login have settled
+            await Task.Yield();
 
-            if (!created.IsSuccessStatusCode)
+            // Read the learnerId that was stored during login
+            _learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
+
+            if (_learnerId == Guid.Empty)
             {
-                _hasError = true;
+                _errorMessage = "No learner profile found. Please log out and log in again.";
                 _isLoading = false;
                 return;
             }
 
-            _learner = await created.Content.ReadFromJsonAsync<LearnerProfile>();
-            _learnerId = _learner!.Id;
+            // Read token for SignalR (HttpClient auth is handled by FluxionAuthStateProvider)
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
 
+            // Fetch the learner profile
+            try
+            {
+                _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
+            }
+            catch
+            {
+                // Learner might not exist yet in the API (first login), that's OK
+            }
+
+            // Set up SignalR connection with JWT token (reuse token from above)
             var apiUrl = Configuration.GetValue<string>("ApiBaseUrl") ?? "http://localhost:5215";
+
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl($"{apiUrl.TrimEnd('/')}/hubs/curriculum")
+                .WithUrl($"{apiUrl.TrimEnd('/')}/hubs/curriculum", options =>
+                {
+                    options.AccessTokenProvider = () => Task.FromResult(token);
+                })
                 .WithAutomaticReconnect()
                 .Build();
+
+            _hubConnection.On<string>("OrchestrationProgress", async (status) =>
+            {
+                _loadingStatus = status;
+                await InvokeAsync(StateHasChanged);
+            });
 
             _hubConnection.On<MorphedModule>("ModuleMorphed", async (module) =>
             {
                 _currentModule = module;
                 _sessionStartTime = DateTime.UtcNow;
+                _loadingStatus = null;
                 _isLoading = false;
                 await InvokeAsync(StateHasChanged);
             });
 
             _hubConnection.On<Fluxion.Core.Models.StudentFeedback>("MasteryUpdated", async (feedback) =>
             {
-                _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
+                try
+                {
+                    _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
+                }
+                catch { }
                 await InvokeAsync(StateHasChanged);
             });
 
-            await _hubConnection.StartAsync();
-            await _hubConnection.SendAsync("JoinLearnerGroup", _learnerId.ToString());
+            try
+            {
+                await _hubConnection.StartAsync();
+                await _hubConnection.SendAsync("JoinLearnerGroup", _learnerId.ToString());
+            }
+            catch
+            {
+                // SignalR connection failure is non-fatal
+            }
 
             await LoadNextModule();
         }
-        catch
+        catch (Exception ex)
         {
-            _hasError = true;
+            _errorMessage = $"Failed to initialize dashboard: {ex.Message}";
             _isLoading = false;
         }
+    }
+
+    private async Task RetryLoad()
+    {
+        _errorMessage = null;
+        _isLoading = true;
+        StateHasChanged();
+        await InitializeDashboard();
+        StateHasChanged();
     }
 
     private async Task LoadNextModule()
@@ -248,23 +353,44 @@ else
             _isLoading = true;
             _feedback = null;
             _studentResponse = "";
+            _inlineAnswers.Clear();
             StateHasChanged();
 
-            var module = await Http.GetFromJsonAsync<MorphedModule>($"api/curriculum/next/{_learnerId}");
-            if (module == null)
+            var response = await Http.GetAsync($"api/curriculum/next/{_learnerId}");
+            
+            if (!response.IsSuccessStatusCode)
             {
-                _hasError = true;
+                _errorMessage = $"API error: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+                _isLoading = false;
+                return;
             }
-            else
+
+            var jsonString = await response.Content.ReadAsStringAsync();
+            try
             {
-                _currentModule = module;
+                var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var module = System.Text.Json.JsonSerializer.Deserialize<MorphedModule>(jsonString, options);
+                
+                if (module == null)
+                {
+                    _errorMessage = "Could not deserialize module. Response was: " + jsonString.Substring(0, Math.Min(jsonString.Length, 100));
+                }
+                else
+                {
+                    _currentModule = module;
+                }
             }
+            catch (System.Text.Json.JsonException jex)
+            {
+                 _errorMessage = $"JSON Deserialization error: {jex.Message}. Raw length: {jsonString.Length}";
+            }
+
             _sessionStartTime = DateTime.UtcNow;
             _isLoading = false;
         }
-        catch
+        catch (Exception ex)
         {
-            _hasError = true;
+            _errorMessage = $"Error loading module: {ex.Message}";
             _isLoading = false;
         }
     }
@@ -275,31 +401,61 @@ else
         
         _isSubmitting = true;
         
-        var timeSpent = (int)(DateTime.UtcNow - _sessionStartTime).TotalSeconds;
-        var request = new 
+        try
         {
-            LearnerId = _learnerId,
-            NodeId = _currentModule!.NodeId,
-            Response = _studentResponse,
-            TimeSpentSeconds = timeSpent,
-            HintRequests = 0,
-            ErrorCount = 0
-        };
+            var timeSpent = (int)(DateTime.UtcNow - _sessionStartTime).TotalSeconds;
+            
+            // Combine main response with all inline answers
+            var combinedResponse = _studentResponse;
+            if (_inlineAnswers.Any(kvp => !string.IsNullOrWhiteSpace(kvp.Value)))
+            {
+                combinedResponse += "\n\n--- INLINE ANSWERS ---\n" + 
+                    string.Join("\n", _inlineAnswers.OrderBy(k => k.Key).Select(kvp => $"[Blank {kvp.Key}]: {kvp.Value}"));
+            }
 
-        var response = await Http.PostAsJsonAsync("api/curriculum/submit", request);
-        
-        var jsonStr = await response.Content.ReadAsStringAsync();
-        
-        var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
-        _feedback = new Fluxion.Core.Models.StudentFeedback
+            var request = new 
+            {
+                LearnerId = _learnerId,
+                NodeId = _currentModule!.NodeId,
+                Response = combinedResponse,
+                TimeSpentSeconds = timeSpent,
+                HintRequests = 0,
+                ErrorCount = 0
+            };
+
+            var response = await Http.PostAsJsonAsync("api/curriculum/submit", request);
+            
+            var jsonStr = await response.Content.ReadAsStringAsync();
+            
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
+            var root = doc.RootElement;
+
+            _feedback = new Fluxion.Core.Models.StudentFeedback
+            {
+                MasteryScore = root.TryGetProperty("masteryScore", out var ms) && ms.ValueKind == System.Text.Json.JsonValueKind.Number 
+                    ? ms.GetDouble() : 0.5,
+                EvaluationDetails = root.TryGetProperty("evaluationDetails", out var ed) && ed.ValueKind == System.Text.Json.JsonValueKind.String 
+                    ? ed.GetString() ?? "" : "Evaluation recorded.",
+                NodeMastered = root.TryGetProperty("nodeMastered", out var nm) && nm.ValueKind == System.Text.Json.JsonValueKind.True,
+                NodeTitle = root.TryGetProperty("nodeTitle", out var nt) && nt.ValueKind == System.Text.Json.JsonValueKind.String 
+                    ? nt.GetString() ?? "" : ""
+            };
+        }
+        catch (Exception ex)
         {
-            MasteryScore = doc.RootElement.GetProperty("masteryScore").GetDouble(),
-            EvaluationDetails = doc.RootElement.GetProperty("evaluationDetails").GetString() ?? "",
-            NodeMastered = doc.RootElement.GetProperty("nodeMastered").GetBoolean(),
-            NodeTitle = doc.RootElement.GetProperty("nodeTitle").GetString() ?? ""
-        };
+            _errorMessage = $"Submission error: {ex.Message}";
+        }
 
         _isSubmitting = false;
+    }
+
+    private static string SanitizeHtml(string html)
+    {
+        // Strip <script> tags and on* event attributes to prevent XSS
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"<script[^>]*>[\s\S]*?</script>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\bon\w+\s*=\s*""[^""]*""", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\bon\w+\s*=\s*'[^']*'", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return html;
     }
 
     private void ClearFeedback()

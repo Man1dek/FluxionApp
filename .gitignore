@@ -28,3 +28,7 @@ Desktop.ini
 appsettings.json
 appsettings.Development.json
 appsettings.Local.json
+
+## Publish artifacts
+publish/
+*.zip

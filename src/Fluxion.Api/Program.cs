@@ -12,27 +12,46 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ── Core Services ───────────────────────────────────────
 
+var connStr = builder.Configuration.GetConnectionString("FluxionDb")
+    ?? throw new InvalidOperationException(
+        "Missing required configuration: ConnectionStrings:FluxionDb. " +
+        "Set it via environment variables, User Secrets, or appsettings.");
 builder.Services.AddDbContext<FluxionDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("FluxionDb") ?? "Data Source=fluxion.db"));
+    options.UseSqlServer(connStr));
 
 builder.Services.AddScoped<IKnowledgeGraphRepository, EfCoreGraphRepository>();
 
 // ── Semantic Kernel + Fluxion AI ────────────────────────
 
-var aiConfig = builder.Configuration.GetSection("FluxionAI");
+var aiProvider = builder.Configuration["FluxionAI:Provider"] ?? "AzureOpenAI";
+var aiModel = builder.Configuration["FluxionAI:ModelOrDeployment"] ?? "gpt-4o";
+
+var aiEndpoint = builder.Configuration["FluxionAI:EndpointOrApiKey"]
+    ?? throw new InvalidOperationException(
+        "Missing required configuration: FluxionAI:EndpointOrApiKey. " +
+        "Set it via environment variables, User Secrets, or appsettings.");
+
+var aiKey = builder.Configuration["FluxionAI:ApiKey"]
+    ?? throw new InvalidOperationException(
+        "Missing required configuration: FluxionAI:ApiKey. " +
+        "Set it via environment variables, User Secrets, or appsettings.");
+
 builder.Services.AddFluxionAI(
-    provider: aiConfig["Provider"] ?? "AzureOpenAI",
-    modelOrDeployment: aiConfig["ModelOrDeployment"] ?? "gpt-4o",
-    endpointOrApiKey: aiConfig["EndpointOrApiKey"] ?? "",
-    apiKey: aiConfig["ApiKey"]);
+    provider: aiProvider,
+    modelOrDeployment: aiModel,
+    endpointOrApiKey: aiEndpoint,
+    apiKey: aiKey);
 
 // ── API Infrastructure ─────────────────────────────────
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
-builder.Services.AddOpenApi();
 
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "SUPER_SECRET_FLUXION_KEY_32_CHARS_LONG";
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException(
+        "Missing required configuration: Jwt:Key. " +
+        "Set it via environment variables, User Secrets, or appsettings.");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -54,16 +73,8 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluxionClient", policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
-        if (allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins);
-        }
-        else
-        {
-            policy.SetIsOriginAllowed(origin => true);
-        }
-        policy.AllowAnyHeader()
+        policy.SetIsOriginAllowed(origin => true)
+              .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Required for SignalR
     });
@@ -71,30 +82,35 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ── Seed the Knowledge Graph ────────────────────────────
-
-using (var scope = app.Services.CreateScope())
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<FluxionDbContext>();
-    await db.Database.EnsureCreatedAsync();
-
-    var graph = scope.ServiceProvider.GetRequiredService<IKnowledgeGraphRepository>();
-    
-    // Only seed if empty
-    var existingNodes = await graph.GetAllNodesAsync();
-    if (existingNodes.Count == 0)
+    using (var scope = app.Services.CreateScope())
     {
-        await GraphSeeder.SeedAsync(graph);
+        var db = scope.ServiceProvider.GetRequiredService<FluxionDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        var graph = scope.ServiceProvider.GetRequiredService<IKnowledgeGraphRepository>();
+        
+        // Only seed if empty
+        var existingNodes = await graph.GetAllNodesAsync();
+        if (existingNodes.Count == 0)
+        {
+            await GraphSeeder.SeedAsync(graph);
+        }
     }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogCritical(ex, "An error occurred during API startup/database initialization.");
 }
 
 // ── Pipeline Configuration ──────────────────────────────
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseDeveloperExceptionPage();
 }
-
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseCors("FluxionClient");
