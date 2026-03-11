@@ -12,7 +12,15 @@
     </div>
 </div>
 
-@if (_nodes == null)
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="glass-card" style="padding:2rem;">
+        <div class="alert-error">
+            <span>⚠️</span> @_error
+        </div>
+    </div>
+}
+else if (_nodes == null)
 {
     <div class="text-center" style="padding:4rem 0;">
         <div class="spinner mb-lg"></div>
@@ -58,21 +66,35 @@ else
     private Dictionary<Guid, double> _mastery = new();
     private string? _error;
 
-    private Guid _mockLearnerId = Guid.Empty;
-
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // Ensure the HttpClient has the Bearer token
-            var token = await LocalStorage.GetItemAsync<string>("authToken");
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                Http.DefaultRequestHeaders.Authorization = 
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
+            // BUG 7 FIX: Removed manual Http.DefaultRequestHeaders.Authorization assignment.
+            // FluxionAuthStateProvider already handles setting the Bearer token on every request.
+
+            // BUG 12 FIX: Read learnerId from LocalStorage and fetch the LearnerProfile
+            // to populate _mastery with real data instead of always showing 0%.
+            var learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
 
             _nodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
+
+            if (learnerId != Guid.Empty)
+            {
+                try
+                {
+                    var learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{learnerId}");
+                    if (learner?.MasteryEntries != null)
+                    {
+                        _mastery = learner.MasteryEntries
+                            .ToDictionary(m => m.NodeId, m => m.MasteryScore);
+                    }
+                }
+                catch
+                {
+                    // Learner profile may not exist yet (first login) — mastery stays empty
+                }
+            }
         }
         catch (Exception ex)
         {

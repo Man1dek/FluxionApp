@@ -451,11 +451,11 @@
 
     private static string SanitizeHtml(string html)
     {
-        // Strip <script> tags and on* event attributes to prevent XSS
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"<script[^>]*>[\s\S]*?</script>", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"\bon\w+\s*=\s*""[^""]*""", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"\bon\w+\s*=\s*'[^']*'", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return html;
+        // BUG 8 FIX: Use the HtmlSanitizer library instead of incomplete regex.
+        // This properly handles unquoted event handlers, javascript: URIs,
+        // <iframe>/<object>/<embed> tags, CSS injection, and more.
+        var sanitizer = new Ganss.Xss.HtmlSanitizer();
+        return sanitizer.Sanitize(html);
     }
 
     private void ClearFeedback()

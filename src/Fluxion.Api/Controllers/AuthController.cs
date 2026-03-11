@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -25,6 +26,9 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         if (await _context.Users.AnyAsync(u => u.Username == request.Username))
             return BadRequest("Username already exists");
 
@@ -38,7 +42,7 @@ public class AuthController : ControllerBase
         var user = new ApplicationUser
         {
             Username = request.Username,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password), // We'll need BCrypt package
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             LearnerProfile = learner
         };
 
@@ -51,6 +55,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         var user = await _context.Users
             .Include(u => u.LearnerProfile)
             .FirstOrDefaultAsync(u => u.Username == request.Username);
@@ -64,6 +71,15 @@ public class AuthController : ControllerBase
             token, 
             user.Username, 
             user.LearnerProfile?.Id ?? Guid.Empty));
+    }
+
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        // Server-side acknowledgment of logout.
+        // Actual token invalidation requires client to discard the token.
+        // For stateless JWTs, the short 1-hour lifetime limits exposure.
+        return Ok(new { Message = "Logged out successfully" });
     }
 
     private string GenerateJwtToken(ApplicationUser user)
@@ -85,7 +101,7 @@ public class AuthController : ControllerBase
             issuer: _config["Jwt:Issuer"] ?? "Fluxion",
             audience: _config["Jwt:Audience"] ?? "FluxionLearners",
             claims: claims,
-            expires: DateTime.UtcNow.AddDays(7),
+            expires: DateTime.UtcNow.AddHours(1),
             signingCredentials: creds
         );
 
@@ -93,6 +109,27 @@ public class AuthController : ControllerBase
     }
 }
 
-public record RegisterRequest(string Username, string Password);
-public record LoginRequest(string Username, string Password);
+public record RegisterRequest(
+    [Required(ErrorMessage = "Username is required")]
+    [MinLength(3, ErrorMessage = "Username must be at least 3 characters")]
+    [MaxLength(50, ErrorMessage = "Username must not exceed 50 characters")]
+    [RegularExpression(@"^[a-zA-Z0-9_\-\.]+$", ErrorMessage = "Username may only contain letters, numbers, underscores, hyphens, and dots")]
+    string Username,
+
+    [Required(ErrorMessage = "Password is required")]
+    [MinLength(8, ErrorMessage = "Password must be at least 8 characters")]
+    [MaxLength(128, ErrorMessage = "Password must not exceed 128 characters")]
+    string Password
+);
+
+public record LoginRequest(
+    [Required(ErrorMessage = "Username is required")]
+    [MaxLength(50, ErrorMessage = "Username must not exceed 50 characters")]
+    string Username,
+
+    [Required(ErrorMessage = "Password is required")]
+    [MaxLength(128, ErrorMessage = "Password must not exceed 128 characters")]
+    string Password
+);
+
 public record AuthResponse(string Token, string Username, Guid LearnerId);

@@ -164,6 +164,16 @@ public class EfCoreGraphRepository : IKnowledgeGraphRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task UpdateCognitiveLoadAsync(Guid learnerId, double cognitiveLoad)
+    {
+        var learner = await _context.Learners.FindAsync(learnerId);
+        if (learner != null)
+        {
+            learner.CognitiveLoadIndex = cognitiveLoad;
+            await _context.SaveChangesAsync();
+        }
+    }
+
     // ── Graph Analytics ────────────────────────────────────
 
     public async Task<IReadOnlyList<KnowledgeNode>> GetLearningPathAsync(

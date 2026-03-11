@@ -19,4 +19,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Fluxion.Core.Tests" />
+  </ItemGroup>
+
 </Project>

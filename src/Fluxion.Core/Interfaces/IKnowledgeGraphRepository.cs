@@ -40,6 +40,7 @@ public interface IKnowledgeGraphRepository
     Task<LearnerProfile?> GetLearnerAsync(Guid learnerId);
     Task UpdateMasteryAsync(Guid learnerId, Guid nodeId, double newScore);
     Task AddSessionRecordAsync(Guid learnerId, SessionRecord record);
+    Task UpdateCognitiveLoadAsync(Guid learnerId, double cognitiveLoad);
 
     // ── Graph Analytics ────────────────────────────────────
 

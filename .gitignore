@@ -32,3 +32,8 @@ appsettings.Local.json
 ## Publish artifacts
 publish/
 *.zip
+
+## SQLite databases
+*.db
+*.db-shm
+*.db-wal

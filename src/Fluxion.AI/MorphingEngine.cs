@@ -61,6 +61,9 @@ public class MorphingEngine
 
         learner.CognitiveLoadIndex = _cognitiveAnalyzer.Calculate(recentSessions);
 
+        // BUG 5 FIX: Persist the calculated cognitive load to the database
+        await _graph.UpdateCognitiveLoadAsync(learnerId, learner.CognitiveLoadIndex);
+
         // Step 2: Get candidate next nodes from the graph
         if (onProgress != null) await onProgress("Selecting optimal next concept in curriculum topology...");
         var candidates = await _graph.GetNextCandidatesAsync(learner.GetMasteryDict());
@@ -78,7 +81,7 @@ public class MorphingEngine
         }
 
         // Step 3: Select the best next node
-        var selectedNode = SelectBestNode(candidates, learner);
+        var selectedNode = await SelectBestNodeAsync(candidates, learner);
 
         // Step 4: Calculate adjusted difficulty
         var adjustedDifficulty = CalculateAdjustedDifficulty(
@@ -161,18 +164,24 @@ public class MorphingEngine
     /// <summary>
     /// Uses an exponential moving average of recent mastery scores to
     /// adjust the next module's difficulty.
+    ///
+    /// BUG 6 FIX: The EMA now seeds from the oldest session and iterates
+    /// toward the newest, so the most recent session has the highest weight.
     /// </summary>
-    private int CalculateAdjustedDifficulty(
+    internal int CalculateAdjustedDifficulty(
         int baseDifficulty, IReadOnlyList<SessionRecord> recentSessions, double cognitiveLoad)
     {
         if (recentSessions.Count == 0)
             return baseDifficulty;
 
         // EMA with alpha = 0.4 (recent sessions weighted more)
+        // recentSessions is sorted most-recent-first (index 0 = newest).
+        // Seed from the oldest (last element) and iterate toward the newest
+        // so the final EMA value is dominated by recent performance.
         const double alpha = 0.4;
-        double ema = recentSessions[0].ScoreAchieved;
+        double ema = recentSessions[^1].ScoreAchieved; // seed from oldest
 
-        for (int i = 1; i < recentSessions.Count; i++)
+        for (int i = recentSessions.Count - 2; i >= 0; i--)
         {
             ema = (alpha * recentSessions[i].ScoreAchieved) + ((1 - alpha) * ema);
         }
@@ -192,11 +201,48 @@ public class MorphingEngine
         return Math.Clamp(baseDifficulty + adjustment, 1, 10);
     }
 
-    private KnowledgeNode SelectBestNode(
+    /// <summary>
+    /// BUG 10 FIX: Attempts AI-based node recommendation via CurriculumPlugin.
+    /// Falls back to a simple heuristic (lowest difficulty first) on failure.
+    /// </summary>
+    private async Task<KnowledgeNode> SelectBestNodeAsync(
         IReadOnlyList<KnowledgeNode> candidates, LearnerProfile learner)
     {
+        try
+        {
+            var candidatesJson = JsonSerializer.Serialize(
+                candidates.Select(c => new { c.Title, c.DifficultyLevel }).ToList());
+            var masteryJson = JsonSerializer.Serialize(
+                learner.GetMasteryDict()
+                    .ToDictionary(
+                        kvp => candidates.FirstOrDefault(c => c.Id == kvp.Key)?.Title ?? kvp.Key.ToString(),
+                        kvp => kvp.Value));
+
+            var plugin = new Plugins.CurriculumPlugin();
+            var resultJson = await _retryPolicy.ExecuteAsync(() =>
+                plugin.RecommendNextNodesAsync(
+                    _kernel, candidatesJson, masteryJson, learner.CognitiveLoadIndex));
+
+            using var doc = JsonDocument.Parse(resultJson);
+            if (doc.RootElement.TryGetProperty("recommendations", out var recs)
+                && recs.GetArrayLength() > 0)
+            {
+                var topTitle = recs[0].GetProperty("nodeTitle").GetString();
+                var match = candidates.FirstOrDefault(
+                    c => c.Title.Equals(topTitle, StringComparison.OrdinalIgnoreCase));
+                if (match != null)
+                {
+                    _logger.LogInformation("AI recommended node: {NodeTitle}", match.Title);
+                    return match;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AI node recommendation failed, falling back to heuristic.");
+        }
+
         // Heuristic fallback: pick the lowest-difficulty unmastered candidate
-        // To save latency, we'll often prefer this over an extra AI call for selection
         return candidates
             .OrderBy(c => c.DifficultyLevel)
             .ThenBy(c => c.Title)
@@ -293,12 +339,7 @@ public class MorphingEngine
             .ToList();
     }
 
-    private static double GetAverageMastery(LearnerProfile learner)
-    {
-        return learner.MasteryEntries.Count > 0
-            ? learner.MasteryEntries.Average(m => m.MasteryScore)
-            : 0.0;
-    }
+    // BUG 11 FIX: Removed dead GetAverageMastery method (had no callers).
 
     private static string BuildRationale(
         KnowledgeNode node, int adjustedDifficulty, ContentFormat format, double cognitiveLoad)

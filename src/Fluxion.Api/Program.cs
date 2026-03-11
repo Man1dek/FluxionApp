@@ -16,8 +16,18 @@ var connStr = builder.Configuration.GetConnectionString("FluxionDb")
     ?? throw new InvalidOperationException(
         "Missing required configuration: ConnectionStrings:FluxionDb. " +
         "Set it via environment variables, User Secrets, or appsettings.");
+
 builder.Services.AddDbContext<FluxionDbContext>(options =>
-    options.UseSqlServer(connStr));
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        options.UseSqlite(connStr);
+    }
+    else
+    {
+        options.UseSqlServer(connStr);
+    }
+});
 
 builder.Services.AddScoped<IKnowledgeGraphRepository, EfCoreGraphRepository>();
 
@@ -69,11 +79,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// ── CORS ────────────────────────────────────────────────
+// Read allowed origins from configuration. In production, set the
+// "AllowedOrigins" environment variable (e.g. "https://fluxion-web.azurewebsites.net").
+
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5215", "https://localhost:7215"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FluxionClient", policy =>
     {
-        policy.SetIsOriginAllowed(origin => true)
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Required for SignalR
