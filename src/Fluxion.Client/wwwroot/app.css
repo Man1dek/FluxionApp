@@ -231,7 +231,13 @@ a:hover { color: var(--accent-purple); }
 }
 
 @media (max-width: 768px) {
-    /* Collapse to single column — hide sidebars in the content grid */
+    /* Collapse parent shell to single column */
+    .dashboard-shell {
+        grid-template-columns: 1fr !important;
+        grid-template-areas: "main" !important;
+    }
+
+    /* Collapse inner layout to single column */
     .dashboard-inner-layout {
         grid-template-columns: 1fr;
         grid-template-areas: "center";
