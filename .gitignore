@@ -31,7 +31,11 @@ appsettings.Local.json
 
 ## Publish artifacts
 publish/
+publish_*/
 *.zip
+
+## Logs
+webapp_logs/
 
 ## SQLite databases
 *.db
