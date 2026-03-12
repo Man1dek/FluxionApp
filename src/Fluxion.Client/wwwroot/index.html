@@ -15,6 +15,9 @@
     
     <link href="app.css" rel="stylesheet" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#00D4FF" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
 </head>
 <body data-theme="dark">
     <!-- Custom Cursor — BUG 6 FIX: explicit inline styles -->
@@ -59,7 +62,11 @@
     
     <!-- Blazor -->
     <script src="_framework/blazor.webassembly.js"></script>
-    
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </body>
 </html>
