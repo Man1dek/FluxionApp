@@ -99,7 +99,11 @@
 
     private void OnThemeChanged() => InvokeAsync(StateHasChanged);
     private void OnSoundToggled() => InvokeAsync(StateHasChanged);
-    private void OnAnimationToggled() => InvokeAsync(StateHasChanged);
+    private void OnAnimationToggled() 
+    {
+        _ = SetBodyClassAsync();
+        InvokeAsync(StateHasChanged);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -158,22 +162,32 @@
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var isAuth = authState.User.Identity?.IsAuthenticated == true;
             
+            var classes = new List<string>();
+            
             if (isAuth)
             {
-                await JS.InvokeVoidAsync("eval", "document.body.className='dashboard-active'");
+                classes.Add("dashboard-active");
             }
             else
             {
                 var uri = Navigation.Uri.ToLower();
                 if (uri.Contains("/login") || uri.Contains("/register"))
                 {
-                    await JS.InvokeVoidAsync("eval", "document.body.className='auth-page-active'");
+                    classes.Add("auth-page-active");
                 }
                 else
                 {
-                    await JS.InvokeVoidAsync("eval", "document.body.className='landing-page'");
+                    classes.Add("landing-page");
                 }
             }
+
+            if (!Animations.AreAnimationsEnabled)
+            {
+                classes.Add("no-animations");
+            }
+
+            var classString = string.Join(" ", classes);
+            await JS.InvokeVoidAsync("eval", $"document.body.className='{classString}'");
         }
         catch { }
     }

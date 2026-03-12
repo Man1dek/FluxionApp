@@ -18,6 +18,14 @@ body.dashboard-active {
     overflow: hidden;
 }
 
+/* Global No-Animations override */
+body.no-animations *, 
+body.no-animations *::before, 
+body.no-animations *::after {
+    animation: none !important;
+    transition: none !important;
+}
+
 /* Landing page scrolls freely */
 body.landing-page {
     overflow-y: auto;
