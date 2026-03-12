@@ -1,0 +1,62 @@
+@inject IJSRuntime JS
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<div class="theme-toggle-wrapper" @onclick="Toggle">
+    <span class="theme-toggle-icon @(!ThemeService.IsDarkMode ? "active" : "")">☀️</span>
+    <div class="theme-toggle-btn @(ThemeService.IsDarkMode ? "dark" : "light")">
+        <div class="theme-toggle-thumb"></div>
+    </div>
+    <span class="theme-toggle-icon @(ThemeService.IsDarkMode ? "active" : "")">🌙</span>
+</div>
+
+<style>
+    .theme-toggle-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 20px;
+        transition: background 0.2s;
+    }
+    .theme-toggle-wrapper:hover {
+        background: var(--bg-tertiary);
+    }
+    .theme-toggle-icon {
+        font-size: 1.1rem;
+        opacity: 0.4;
+        transition: opacity 0.3s, transform 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+    }
+    .theme-toggle-icon.active {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += OnChanged;
+    }
+
+    private async Task Toggle()
+    {
+        await ThemeService.ToggleAsync(JS);
+    }
+
+    private void OnChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= OnChanged;
+    }
+}

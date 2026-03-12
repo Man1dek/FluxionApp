@@ -1,42 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fluxion — AI-Powered Learning</title>
     <meta name="description" content="AI-orchestrated adaptive learning platform with kinetic curriculum." />
     <base href="/" />
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Highlight.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    
     <link href="app.css" rel="stylesheet" />
     <link rel="icon" type="image/png" href="favicon.png" />
 </head>
+<body data-theme="dark">
+    <!-- Custom Cursor — BUG 6 FIX: explicit inline styles -->
+    <div id="cursor-dot" 
+         aria-hidden="true"
+         style="display:none; 
+                position:fixed !important; 
+                width:8px !important; 
+                height:8px !important; 
+                border-radius:50% !important; 
+                background:#00D4FF !important;
+                pointer-events:none !important; 
+                z-index:2147483647 !important;
+                left:0 !important;
+                top:0 !important;
+                will-change:transform;">
+    </div>
 
-<body>
     <div id="app">
-        <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#FAFBFC;">
+        <!-- Dark themed splash screen -->
+        <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#0D1117;">
             <div style="text-align:center;">
-                <div
-                    style="font-family:'Plus Jakarta Sans',sans-serif; font-size:1.8rem; font-weight:800; color:#0E0F14; letter-spacing:-0.5px; margin-bottom:1.5rem;">
-                    FLUXION</div>
-                <div
-                    style="width:32px; height:32px; border:3px solid rgba(0,0,0,0.06); border-top-color:#4F46E5; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 1rem;">
+                <div style="font-family:'Plus Jakarta Sans',sans-serif; font-size:1.8rem; font-weight:800; color:#F1F5F9; letter-spacing:-0.5px; margin-bottom:1.5rem;">
+                    FLUXION
                 </div>
-                <div style="color:#8B90A5; font-size:0.85rem; font-family:'Plus Jakarta Sans',sans-serif;">Initializing…
+                <div style="width:32px; height:32px; border:3px solid rgba(255,255,255,0.06); border-top-color:#00D4FF; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto 1rem;">
                 </div>
+                <div style="color:#8B90A5; font-size:0.85rem; font-family:'Plus Jakarta Sans',sans-serif;">Initializing Neural Path…</div>
             </div>
         </div>
-        <style>
-            @keyframes spin {
-                to {
-                    transform: rotate(360deg)
-                }
-            }
-        </style>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     </div>
-    <script src="_framework/blazor.webassembly.js"></script>
-    <script src="js/kinetic.js"></script>
-</body>
 
+    <!-- Scripts -->
+    <script src="js/theme.js"></script>
+    <script src="js/animations.js"></script>
+    <script src="js/cursor.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/brain-state.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/kinetic.js"></script>
+    
+    <!-- Blazor -->
+    <script src="_framework/blazor.webassembly.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</body>
 </html>

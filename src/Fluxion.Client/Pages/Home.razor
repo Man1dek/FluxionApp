@@ -5,250 +5,451 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject Fluxion.Client.Services.SoundService Sound
+@inject Fluxion.Client.Services.ThemeService ThemeService
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <PageTitle>Fluxion — AI-Powered Learning</PageTitle>
 
 <AuthorizeView>
     <NotAuthorized>
-        @* ── Unauthenticated Landing Page ── *@
+        <!-- ── Unauthenticated Landing Page ── -->
         <section class="hero-section">
             <h1 class="hero-title">
-                The future of <span class="accent-word">adaptive</span> learning
+                The future of <span class="text-gradient">adaptive</span> learning
             </h1>
             <p class="hero-subtitle">
                 An AI-powered engine that morphs content in real-time based on your 
                 cognitive profile. Personalized curriculum, reimagined.
             </p>
             <div class="hero-actions">
-                <a href="/login" class="btn btn-primary" style="text-decoration:none;">Sign In →</a>
-                <a href="/register" class="btn btn-outline" style="text-decoration:none;">Create Account</a>
+                <a href="/login" class="btn btn-outline" style="min-width:140px;">Sign In →</a>
+                <a href="/register" class="btn btn-cyan" style="min-width:180px;">Get Started</a>
             </div>
         </section>
 
-        <div class="bento-grid" style="max-width:920px; margin:0 auto; padding:0 2.5rem;">
+        <div class="bento-grid">
             <div class="bento-card">
                 <div class="bento-icon">🧠</div>
                 <h4>Adaptive Content</h4>
-                <p>AI analyzes your cognitive load in real-time to morph lessons to your exact level and learning style.</p>
+                <p class="text-dim">AI analyzes your cognitive load in real-time to morph lessons to your exact level and learning style.</p>
             </div>
             <div class="bento-card">
                 <div class="bento-icon">📊</div>
                 <h4>Mastery Tracking</h4>
-                <p>Progress through a knowledge graph — unlock new concepts as you master fundamentals.</p>
+                <p class="text-dim">Progress through a knowledge graph — unlock new concepts as you master fundamentals.</p>
             </div>
             <div class="bento-card">
                 <div class="bento-icon">⚡</div>
                 <h4>Active Recall</h4>
-                <p>Practice exercises evaluated by AI with instant feedback and precision mastery scoring.</p>
+                <p class="text-dim">Practice exercises evaluated by AI with instant feedback and precision mastery scoring.</p>
             </div>
         </div>
 
-        <div class="proof-section" style="max-width:920px; margin:0 auto;">
-            <div class="section-label">Built with purpose</div>
+        <div class="proof-section">
+            <div class="text-dim" style="font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:1rem;">Built with purpose</div>
             <div class="proof-quote">
-                "Learning should feel like a conversation, not a lecture.
-                Fluxion makes that possible."
+                "Learning should feel like a conversation, not a lecture."
             </div>
-            <div class="proof-attribution">The Fluxion Team</div>
+            <div class="text-dim">— The Fluxion Team</div>
         </div>
 
         <div class="cta-section">
-            <h2>Ready to transform how you learn?</h2>
-            <p>Start your AI-orchestrated journey today. No credit card required.</p>
-            <div class="hero-actions">
-                <a href="/register" class="btn btn-primary" style="text-decoration:none;">Get Started →</a>
-            </div>
+            <h2 class="heading-xl mb-md">Ready to transform how you learn?</h2>
+            <p class="text-dim mb-xl">Start your AI-orchestrated journey today. No credit card required.</p>
+            <a href="/register" class="btn btn-cyan">Build Neural Path →</a>
         </div>
     </NotAuthorized>
 
     <Authorized>
-        @* ── Authenticated Dashboard ── *@
-        <div class="page-header">
-            <div>
-                <h1 class="heading-xl text-shimmer">Kinetic Curriculum</h1>
-                <p class="text-dim mt-sm">AI-orchestrated adaptive learning environment</p>
-            </div>
-            <div class="flex gap-md items-center">
-                @if (_learner != null)
+        <!-- ── Authenticated Inner Dashboard Layout ── -->
+        <div class="dashboard-inner-layout">
+            
+            <main class="center-panel">
+                @if (_initError != null)
                 {
-                    <div class="stat-badge">
-                       <span>🧠</span> @(_learner.CognitiveLoadIndex.ToString("P0")) Load
-                    </div>
-                    <div class="stat-badge">
-                       <span>🎯</span> @(_learner.MasteryEntries.Count(m => m.MasteryScore >= 0.7)) / @_totalNodes Mastered
+                    <div class="glass-card module-card" style="padding:2.5rem; text-align:center;">
+                        <div style="font-size:3rem; margin-bottom:1rem;">⚠️</div>
+                        <h2 class="heading-lg mb-sm">Neural Link Failed</h2>
+                        <p class="text-dim mb-xl">@_initError</p>
+                        <button class="btn btn-cyan" @onclick="RetryInit">Retry Sync →</button>
                     </div>
                 }
-            </div>
-        </div>
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <div class="glass-card module-card" style="padding:2rem;">
-                <div class="alert-error">
-                    <span>⚠️</span> @_errorMessage
-                </div>
-                <button class="btn btn-primary mt-lg" @onclick="RetryLoad">Retry →</button>
-            </div>
-        }
-        else if (_isLoading)
-        {
-            <div class="glass-card module-card text-center" style="padding:4rem 2rem;">
-                <div class="spinner mb-lg"></div>
-                <h2 class="heading-md text-gradient mb-sm">Orchestrating Next Module…</h2>
-                <p class="text-dim">@(_loadingStatus ?? "Analyzing your cognitive profile and preparing content.")</p>
-                <div class="flex gap-sm items-center mt-xl" style="justify-content:center;">
-                    <div class="skeleton" style="width:200px; height:14px;"></div>
-                    <div class="skeleton" style="width:160px; height:14px;"></div>
-                    <div class="skeleton" style="width:120px; height:14px;"></div>
-                </div>
-            </div>
-        }
-        else if (_currentModule != null)
-        {
-            <div class="glass-card module-card">
-                <div class="module-meta">
-                    <span class="tag tag-pink">@_currentModule.SelectedFormat</span>
-                    <div class="difficulty-indicator">
-                        @for (int i = 1; i <= 10; i++)
-                        {
-                            <span class="diff-dot @(i <= _currentModule.AdjustedDifficulty ? "active" : "")"></span>
-                        }
-                    </div>
-                    <span class="tag tag-accent">Level @_currentModule.AdjustedDifficulty</span>
-                </div>
-                
-                <h2 class="heading-lg text-gradient mb-lg">@_currentModule.NodeTitle</h2>
-
-                @if (!string.IsNullOrEmpty(_currentModule.MorphingRationale))
+                else if (_isLoading)
                 {
-                    <div class="ai-rationale">
-                        <div class="label">AI Morphing Logic</div>
-                        <p class="text-dim" style="margin:0; font-size:0.88rem;">@_currentModule.MorphingRationale</p>
+                    <div class="glass-card module-card module-loading-card">
+                        <div class="spinner"></div>
+                        <div class="module-loading-title">Initializing Neural Path...</div>
+                        <p class="text-dim">@_loadingStatus</p>
                     </div>
                 }
+                else
+                {
+                    <div class="mb-xl">
+                        <h2 class="heading-lg welcome-heading">Welcome back, @_username.</h2>
+                    <p class="text-dim mb-xl">Your neural path is prepared and optimized.</p>
 
-                <div class="md-content mb-xl">
-                    @((MarkupString)SanitizeHtml(Markdig.Markdown.ToHtml(_currentModule.Content)))
+                    <div class="stat-card-row">
+                        <div class="stat-badge-custom">
+                            <div class="stat-icon">🧠</div>
+                            <div class="stat-info">
+                                <div class="stat-value"><span id="stat-load">@((_cognitiveLoad).ToString("P0"))</span></div>
+                                <div class="stat-label">Cognitive Load</div>
+                                <div class="stat-subtitle text-dim" id="stat-load-lbl">@GetBrainStateLabel(_cognitiveLoad)</div>
+                            </div>
+                        </div>
+                        <div class="stat-badge-custom">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-info">
+                                <div class="stat-value"><span id="stat-mastered">@_masteredCount</span> / @_totalNodes</div>
+                                <div class="stat-label">Mastered</div>
+                            </div>
+                        </div>
+                        <div class="stat-badge-custom">
+                            <div class="stat-icon">⚡</div>
+                            <div class="stat-info">
+                                <div class="stat-value"><span id="stat-streak">@_streak</span> days</div>
+                                <div class="stat-label">Streak</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="practice-section">
-                    <h3 class="heading-md mb-lg flex items-center gap-sm">
-                        <span>✍️</span> Active Recall
-                    </h3>
-                    
-                    @if (_currentModule.PracticeQuestions.Any())
+                @if (_currentModule != null)
+                {
+                    if (!_inPracticeMode)
                     {
-                        <div class="mb-lg">
-                            @for (int i = 0; i < _currentModule.PracticeQuestions.Count; i++)
+                        <!-- Step-by-Step Lesson Card -->
+                        <div id="step-card" class="step-card">
+                            <div class="step-progress-bar">
+                                <div class="step-progress-header">
+                                    <span class="step-counter">
+                                        Step @(_currentStepIndex + 1) of @_steps.Count
+                                    </span>
+                                    <span class="step-time">
+                                        ~@(_steps[_currentStepIndex].EstimatedMinutes) min read
+                                    </span>
+                                </div>
+                                <div class="step-progress-track">
+                                    <div class="step-progress-fill" 
+                                         style="width: @((_currentStepIndex + 1) * 100 / _steps.Count)%">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h2 class="step-title">@_steps[_currentStepIndex].Title</h2>
+
+                            <div class="step-content md-content">
+                                @((MarkupString)SanitizeHtml(Markdig.Markdown.ToHtml(_steps[_currentStepIndex].Content)))
+                            </div>
+
+                            <div class="flex items-center justify-between mt-xl p-md" style="border-top: 1px solid var(--glass-border);">
+                                <button class="btn btn-outline" 
+                                        @onclick="PrevStep"
+                                        disabled="@(_currentStepIndex == 0)">
+                                    ← Previous
+                                </button>
+                                
+                                <!-- Show "3 / 16" instead of 16 dots -->
+                                <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 0.4rem 1rem; border-radius: 99px;">
+                                    @(_currentStepIndex + 1) / @_steps.Count
+                                </div>
+                                
+                                <button class="btn btn-cyan" 
+                                        @onclick="NextStep">
+                                    @(_currentStepIndex == _steps.Count - 1 
+                                        ? "Practice →" 
+                                        : "Next →")
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Practice Mode -->
+                        <div id="practice-card" class="step-card">
+                             <div class="flex items-center justify-between mb-lg">
+                                <div class="heading-md flex items-center gap-sm"><span>⚡</span> Active Recall</div>
+                                <span class="step-counter">Question @(_currentPracticeIndex + 1) of @_currentModule.PracticeQuestions.Count</span>
+                            </div>
+
+                            @if (_currentPracticeIndex < _currentModule.PracticeQuestions.Count)
                             {
-                                var q = _currentModule.PracticeQuestions[i];
-                                <div class="question-item">
-                                    @RenderQuestionWithBlanks(q, i)
+                                var qText = _currentModule.PracticeQuestions[_currentPracticeIndex];
+                                var cleanQ = CleanQuestion(qText);
+                                var qType = DetectQuestionType(cleanQ);
+
+                                <div class="step-content md-content mb-xl">
+                                    @((MarkupString)SanitizeHtml(Markdig.Markdown.ToHtml(cleanQ)))
+                                </div>
+
+                                <div class="mb-xl">
+                                    @if (qType == QuestionType.TrueFalse)
+                                    {
+                                        <div class="flex gap-md w-full">
+                                            <button class="tf-btn true @(_practiceAnswers[_currentPracticeIndex] == "True" ? "active" : "")" 
+                                                    @onclick="@(()=>SetAnswer("True"))">✓ True</button>
+                                            <button class="tf-btn false @(_practiceAnswers[_currentPracticeIndex] == "False" ? "active" : "")" 
+                                                    @onclick="@(()=>SetAnswer("False"))">✗ False</button>
+                                        </div>
+                                    }
+                                    @if (qType == QuestionType.Code)
+                                    {
+                                        <textarea class="code-editor-area" 
+                                                  @bind="_practiceAnswers[_currentPracticeIndex]" 
+                                                  placeholder="// Write your code solution here..."></textarea>
+                                    }
+                                    @if (qType == QuestionType.Text)
+                                    {
+                                        <textarea class="input" style="min-height:140px;" 
+                                                  @bind="_practiceAnswers[_currentPracticeIndex]" 
+                                                  placeholder="Explain your reasoning..."></textarea>
+                                    }
+                                </div>
+
+                                <div class="step-navigation">
+                                    <button class="btn btn-outline" @onclick="@(() => _inPracticeMode = false)">← Back to Lesson</button>
+                                    
+                                    @if (_currentPracticeIndex < _currentModule.PracticeQuestions.Count - 1)
+                                    {
+                                        <button class="btn btn-cyan" @onclick="NextQuestion" 
+                                                disabled="@string.IsNullOrWhiteSpace(_practiceAnswers[_currentPracticeIndex])">
+                                            Next Question →
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-primary" @onclick="SubmitPractice" 
+                                                disabled="@(_isSubmitting || string.IsNullOrWhiteSpace(_practiceAnswers[_currentPracticeIndex]))">
+                                            @(_isSubmitting ? "Evaluating..." : "Complete Module →")
+                                        </button>
+                                    }
                                 </div>
                             }
                         </div>
                     }
+                }
 
-                    <div class="mb-lg">
-                        <textarea @bind="_studentResponse" 
-                                  placeholder="Describe your understanding or provide the solution…" 
-                                  class="input"></textarea>
-                    </div>
-
-                    <div class="text-right">
-                        <button class="btn btn-primary" 
-                                @onclick="SubmitResponse" 
-                                disabled="@(_isSubmitting || string.IsNullOrWhiteSpace(_studentResponse))">
-                            @(_isSubmitting ? "Evaluating…" : "Submit to AI Engine →")
-                        </button>
-                    </div>
-                </div>
-
+                <!-- Feedback Display -->
                 @if (_feedback != null)
                 {
                     <div class="feedback-card @(_feedback.NodeMastered ? "success" : "warning")">
-                        <div class="score-ring">
+                        <div class="mastery-ring">
                             @((_feedback.MasteryScore * 100).ToString("F0"))%
                         </div>
                         <div style="flex:1;">
-                            <h4 class="heading-md mb-sm">@(_feedback.NodeMastered ? "Mastery Achieved!" : "Keep Going")</h4>
-                            <p class="text-dim mb-md" style="font-size:0.9rem;">@_feedback.EvaluationDetails</p>
+                            <h4 class="heading-md mb-sm">@(_feedback.NodeMastered ? "Mastery Achieved!" : "Needs Review")</h4>
+                            <p class="text-dim mb-md">@_feedback.EvaluationDetails</p>
                             @if (_feedback.NodeMastered)
                             {
-                                <button class="btn btn-success" @onclick="LoadNextModule">Next Module →</button>
+                                <button class="btn btn-cyan" @onclick="LoadNextModule">Next Module →</button>
                             }
                             else
                             {
-                                <button class="btn btn-outline" @onclick="ClearFeedback">Try Again</button>
+                                <button class="btn btn-outline" @onclick="@(() => _feedback = null)">Retry Practice</button>
                             }
                         </div>
                     </div>
                 }
+                }
+            </main>
+
+            <!-- RIGHT SIDEBAR (Always Render) -->
+            <aside class="right-sidebar">
+                <!-- Brain State -->
+                <div class="sidebar-card brain-state-card">
+                    <div class="sidebar-card-title">
+                        🧠 BRAIN STATE
+                    </div>
+                    <div class="brain-state-canvas-wrapper">
+                        <canvas id="brain-state-canvas" 
+                                width="140" 
+                                height="120"
+                                style="display:block; 
+                                       width:140px;
+                                       height:120px;
+                                       margin:0 auto;
+                                       opacity:0;
+                                       transition:opacity 400ms ease;">
+                        </canvas>
+                    </div>
+                    <div class="brain-state-label">
+                        @GetBrainStateLabel(_cognitiveLoad)
+                    </div>
+                </div>
+
+                <!-- AI Morphing Logic -->
+                @if (_currentModule != null)
+                {
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-title @(_morphingExpanded ? "expanded" : "")" 
+                             @onclick="() => _morphingExpanded = !_morphingExpanded"
+                             style="cursor:pointer;">
+                            🤖 Why this module? <span>▼</span>
+                        </div>
+                        @if (_morphingExpanded)
+                        {
+                            <p id="morphing-rationale" class="rationale-text">
+                                @_currentModule.MorphingRationale
+                            </p>
+                        }
+                    </div>
+                }
+
+                <!-- Session Stats -->
+                <div class="sidebar-card">
+                    <div class="sidebar-card-title">⏱ Session Stats</div>
+                    <div class="stat-row">
+                        <span>Time</span>
+                        <span>@_sessionTimerDisplay</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Format</span>
+                        <span class="tag tag-pink">@(_currentModule?.SelectedFormat.ToString() ?? "—")</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Difficulty</span>
+                        <span>@(_currentModule?.AdjustedDifficulty ?? 0)/10</span>
+                    </div>
+                </div>
+
+                <!-- Curriculum Mini-Map -->
+                <div class="sidebar-card">
+                    <div class="sidebar-card-title">📍 Curriculum</div>
+                    @if (_allNodes != null)
+                    {
+                        <div class="node-pills">
+                            @foreach (var node in _allNodes.OrderBy(n => n.DifficultyLevel).Take(8))
+                            {
+                                var score = _learner?.MasteryEntries.FirstOrDefault(m => m.NodeId == node.Id)?.MasteryScore ?? 0;
+                                var state = score >= node.MasteryThreshold ? "mastered" : score > 0 ? "in-progress" : "locked";
+                                <div class="node-pill @state">@node.Title</div>
+                            }
+                        </div>
+                        <a href="/progress" class="view-all-link">View full map →</a>
+                    }
+                </div>
+            </aside>
+        </div>
+
+        @if (_showMasteryOverlay)
+        {
+            <div class="mastery-overlay">
+                @for(int i=0; i<30; i++)
+                {
+                    <div class="confetti" style="left:@(Random.Shared.Next(0,100))vw; animation-delay:@(Random.Shared.NextDouble())s; background: var(--accent-cyan)"></div>
+                }
+                <div class="mastery-banner">
+                    <div style="font-size:4rem; margin-bottom:1rem;">🎉</div>
+                    <h2 class="heading-xl text-gradient mb-sm">Goal Achieved!</h2>
+                    <p class="text-dim">You have mastered <b>@_currentModule?.NodeTitle</b></p>
+                    <button class="btn btn-cyan mt-xl" @onclick="CloseOverlay">Continue Path →</button>
+                </div>
             </div>
         }
     </Authorized>
 </AuthorizeView>
 
 @code {
+    private string _username = "";
     private Guid _learnerId;
     private LearnerProfile? _learner;
     private MorphedModule? _currentModule;
-    private HubConnection? _hubConnection;
-    private int _totalNodes = 15;
-
+    private List<KnowledgeNode>? _allNodes;
+    private string? _initError = null;
+    private string _loadingStatus = "";
     private bool _isLoading = true;
-    private bool _isSubmitting = false;
-    private string? _errorMessage;
-    private string? _loadingStatus;
-    private string _studentResponse = "";
+
+    // Module Stepping
+    private List<ModuleStep> _steps = new();
+    private int _currentStepIndex = 0;
+    private bool _inPracticeMode = false;
+    private int _currentPracticeIndex = 0;
+    private List<string> _practiceAnswers = new();
+
+    // Stats & Session
+    private string _sessionTimerDisplay = "0:00";
     private DateTime _sessionStartTime;
-    
-    private Fluxion.Core.Models.StudentFeedback? _feedback;
-    private Dictionary<string, string> _inlineAnswers = new();
+    private System.Threading.Timer? _sessionTimerObj;
+    private bool _morphingExpanded = false;
+    private int _masteredCount = 0;
+    private int _totalNodes = 0;
+    private int _streak = 1;
 
-    private RenderFragment RenderQuestionWithBlanks(string question, int questionIndex) => builder =>
+    private double _cognitiveLoad = 0.3;
+    private class AnswerRecord
     {
-        // detects sequences of 3 or more underscores
-        var regex = new System.Text.RegularExpressions.Regex(@"_{3,}");
-        var parts = regex.Split(question);
-        var matches = regex.Matches(question);
+        public bool IsCorrect { get; set; }
+        public DateTime AnsweredAt { get; set; } = DateTime.UtcNow;
+    }
+    private List<AnswerRecord> _recentAnswers = new List<AnswerRecord>();
 
-        for (int i = 0; i < parts.Length; i++)
+    private bool _isSubmitting = false;
+    private StudentFeedback? _feedback;
+    private bool _showMasteryOverlay = false;
+    private bool _moduleLoaded = false;
+
+    private HubConnection? _hubConnection;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    public class ModuleStep
+    {
+        public string Title { get; set; } = "";
+        public string Content { get; set; } = "";
+        public int EstimatedMinutes { get; set; } = 1;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
         {
-            builder.AddContent(i * 2, parts[i]);
-            
-            if (i < matches.Count)
-            {
-                var inputKey = $"{questionIndex}_{i}";
-                if (!_inlineAnswers.ContainsKey(inputKey)) _inlineAnswers[inputKey] = "";
-
-                builder.OpenElement(i * 2 + 1, "input");
-                builder.AddAttribute(i * 2 + 2, "class", "inline-blank");
-                builder.AddAttribute(i * 2 + 3, "placeholder", "…");
-                builder.AddAttribute(i * 2 + 4, "value", Microsoft.AspNetCore.Components.BindConverter.FormatValue(_inlineAnswers[inputKey]));
-                builder.AddAttribute(i * 2 + 5, "oninput", Microsoft.AspNetCore.Components.EventCallback.Factory.CreateBinder(this, __value => _inlineAnswers[inputKey] = __value ?? "", _inlineAnswers[inputKey]));
-                builder.CloseElement();
-            }
+            // Initial auth handled in OnAfterRenderAsync(firstRender) for WASM compat,
+            // but we can prep the loading state here.
+            _isLoading = true;
         }
-    };
-
-    [CascadingParameter]
-    private Task<AuthenticationState>? AuthState { get; set; }
+        catch (Exception ex)
+        {
+            _initError = $"Critical boot error: {ex.Message}";
+            _isLoading = false;
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-
-        // Check if user is authenticated
-        if (AuthState != null)
+        try
         {
-            var state = await AuthState;
-            if (state.User.Identity?.IsAuthenticated == true)
+            if (firstRender && AuthState != null)
             {
-                await InitializeDashboard();
-                StateHasChanged();
+                var state = await AuthState;
+                if (state.User.Identity?.IsAuthenticated == true)
+                {
+                    _username = state.User.Identity.Name ?? "Learner";
+                    await InitializeDashboard();
+                }
+                else
+                {
+                    _isLoading = false;
+                    StateHasChanged();
+                }
             }
+            
+            if (_learner != null && _moduleLoaded)
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("fluxionBrainState.draw", "brain-state-canvas", _cognitiveLoad);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"BrainState JS Error: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Dashboard Render Crash Prevented: {ex.Message}");
         }
     }
 
@@ -256,218 +457,623 @@
     {
         try
         {
-            // Yield to ensure local storage writes from login have settled
-            await Task.Yield();
+            _isLoading = true;
+            _initError = null;
+            StateHasChanged();
 
-            // Read the learnerId that was stored during login
             _learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
-
             if (_learnerId == Guid.Empty)
             {
-                _errorMessage = "No learner profile found. Please log out and log in again.";
                 _isLoading = false;
+                _initError = "Neural identity not found. Please re-authenticate.";
                 return;
             }
 
-            // Read token for SignalR (HttpClient auth is handled by FluxionAuthStateProvider)
-            var token = await LocalStorage.GetItemAsync<string>("authToken");
-
-            // Fetch the learner profile
-            try
+            // Load data
+            _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
+            _allNodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
+            
+            if (_learner != null)
             {
-                _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
-            }
-            catch
-            {
-                // Learner might not exist yet in the API (first login), that's OK
+                RecalculateMastery();
+                _cognitiveLoad = Math.Max(_learner.CognitiveLoadIndex, 0.3);
             }
 
-            // Set up SignalR connection with JWT token (reuse token from above)
-            var apiUrl = Configuration.GetValue<string>("ApiBaseUrl") ?? "http://localhost:5215";
-
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl($"{apiUrl.TrimEnd('/')}/hubs/curriculum", options =>
-                {
-                    options.AccessTokenProvider = () => Task.FromResult(token);
-                })
-                .WithAutomaticReconnect()
-                .Build();
-
-            _hubConnection.On<string>("OrchestrationProgress", async (status) =>
-            {
-                _loadingStatus = status;
-                await InvokeAsync(StateHasChanged);
-            });
-
-            _hubConnection.On<MorphedModule>("ModuleMorphed", async (module) =>
-            {
-                _currentModule = module;
-                _sessionStartTime = DateTime.UtcNow;
-                _loadingStatus = null;
-                _isLoading = false;
-                await InvokeAsync(StateHasChanged);
-            });
-
-            _hubConnection.On<Fluxion.Core.Models.StudentFeedback>("MasteryUpdated", async (feedback) =>
-            {
-                try
-                {
-                    _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{_learnerId}");
-                }
-                catch { }
-                await InvokeAsync(StateHasChanged);
-            });
-
-            try
-            {
-                await _hubConnection.StartAsync();
-                await _hubConnection.SendAsync("JoinLearnerGroup", _learnerId.ToString());
-            }
-            catch
-            {
-                // SignalR connection failure is non-fatal
-            }
-
+            await InitializeStreak();
+            await SetupSignalR();
             await LoadNextModule();
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await LocalStorage.RemoveItemAsync("authToken");
+            await LocalStorage.RemoveItemAsync("learnerId");
+            Navigation.NavigateTo("/login");
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to initialize dashboard: {ex.Message}";
+            _initError = $"Dashboard calibration failed: {ex.Message}";
             _isLoading = false;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
         }
     }
 
-    private async Task RetryLoad()
+    private async Task RetryInit()
     {
-        _errorMessage = null;
+        _initError = null;
         _isLoading = true;
         StateHasChanged();
         await InitializeDashboard();
-        StateHasChanged();
+    }
+
+    // ═══ BUG 6 FIX: Streak initialization ═══
+    private async Task InitializeStreak()
+    {
+        try
+        {
+            var lastDateStr = await LocalStorage.GetItemAsync<string>("fluxion_streak_date");
+            var countStr = await LocalStorage.GetItemAsync<string>("fluxion_streak_count");
+                
+            var today = DateTime.UtcNow.Date;
+            
+            if (!string.IsNullOrEmpty(lastDateStr) && 
+                DateTime.TryParse(lastDateStr, out var lastDate))
+            {
+                var daysDiff = (today - lastDate.Date).Days;
+                _streak = int.TryParse(countStr, out var c) ? c : 0;
+                
+                if (daysDiff == 0)
+                {
+                    // Same day — keep streak
+                }
+                else if (daysDiff == 1)
+                {
+                    // Consecutive day — increment
+                    _streak++;
+                    await LocalStorage.SetItemAsync("fluxion_streak_date", today.ToString("O"));
+                    await LocalStorage.SetItemAsync("fluxion_streak_count", _streak.ToString());
+                }
+                else
+                {
+                    // Streak broken
+                    _streak = 1;
+                    await LocalStorage.SetItemAsync("fluxion_streak_date", today.ToString("O"));
+                    await LocalStorage.SetItemAsync("fluxion_streak_count", "1");
+                }
+            }
+            else
+            {
+                // First visit
+                _streak = 1;
+                await LocalStorage.SetItemAsync("fluxion_streak_date", today.ToString("O"));
+                await LocalStorage.SetItemAsync("fluxion_streak_count", "1");
+            }
+        }
+        catch { _streak = 1; }
+    }
+
+    private async Task SetupSignalR()
+    {
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        var apiUrl = Configuration.GetValue<string>("ApiBaseUrl") ?? Navigation.BaseUri;
+        
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl($"{apiUrl.TrimEnd('/')}/hubs/curriculum", options => {
+                options.AccessTokenProvider = () => Task.FromResult(token);
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<string>("OrchestrationProgress", async status => {
+            _loadingStatus = status;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<MorphedModule>("ModuleMorphed", async m => {
+            SetupNewModule(m);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinLearnerGroup", _learnerId.ToString());
     }
 
     private async Task LoadNextModule()
     {
+        _isLoading = true;
+        _initError = null;
+        _feedback = null;
+        _inPracticeMode = false;
+        _moduleLoaded = false;
+        StateHasChanged();
+
         try
         {
-            _isLoading = true;
-            _feedback = null;
-            _studentResponse = "";
-            _inlineAnswers.Clear();
-            StateHasChanged();
-
-            var response = await Http.GetAsync($"api/curriculum/next/{_learnerId}");
-            
-            if (!response.IsSuccessStatusCode)
+            var res = await Http.GetAsync($"api/curriculum/next/{_learnerId}");
+            if (res.IsSuccessStatusCode)
             {
-                _errorMessage = $"API error: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
-                _isLoading = false;
+                var module = await res.Content.ReadFromJsonAsync<MorphedModule>();
+                if (module != null) {
+                    SetupNewModule(module);
+                    _ = RefreshMasteryData(); // async update mastery stats
+                }
+            }
+            else if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await LocalStorage.RemoveItemAsync("authToken");
+                await LocalStorage.RemoveItemAsync("learnerId");
+                Navigation.NavigateTo("/login");
                 return;
             }
-
-            var jsonString = await response.Content.ReadAsStringAsync();
-            try
+            else
             {
-                var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var module = System.Text.Json.JsonSerializer.Deserialize<MorphedModule>(jsonString, options);
+                _initError = "You've completed your current path topology!";
+            }
+        }
+        catch { _initError = "Connection error."; }
+        
+        _isLoading = false;
+        _moduleLoaded = true;
+        StateHasChanged();
+    }
+
+    private void SetupNewModule(MorphedModule m)
+    {
+        _currentModule = m;
+        ParseModuleIntoSteps(m.Content);
+        _practiceAnswers = new List<string>(new string[m.PracticeQuestions.Count]);
+        _currentPracticeIndex = 0;
+        StartSessionTimer();
+        RebindJS();
+    }
+
+    private void ParseModuleIntoSteps(string markdownContent)
+    {
+        try
+        {
+            _steps = new List<ModuleStep>();
+            if (string.IsNullOrWhiteSpace(markdownContent)) return;
+
+            // Step 1: Remove answer keys
+            var lines = markdownContent.Split('\n').ToList();
+            lines = lines.Where(l => !System.Text.RegularExpressions
+                .Regex.IsMatch(l.Trim(), 
+                    @"^[\*\-]?\s*[\*_]*Answer[\*_]*\s*[:.]",
+                    System.Text.RegularExpressions.RegexOptions
+                        .IgnoreCase))
+                .ToList();
+            var content = string.Join('\n', lines);
+
+            // Step 2: Try splitting by H3 (###) first — more granular
+            var h3Pattern = @"(?=^###\s)";
+            var h3Sections = System.Text.RegularExpressions.Regex
+                .Split(content, h3Pattern,
+                    System.Text.RegularExpressions.RegexOptions.Multiline)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
+
+            // Step 3: If H3 gives us 3+ sections, use H3 splitting
+            if (h3Sections.Count >= 3)
+            {
+                foreach (var section in h3Sections)
+                {
+                    var sLines = section.Split('\n');
+                    var title = sLines[0].TrimStart('#').Trim();
+                    var body = string.Join('\n', sLines.Skip(1)).Trim();
+                    
+                    // Skip "Sections:" header-only steps
+                    if (title.Equals("Sections", 
+                        StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.IsNullOrWhiteSpace(body) && 
+                        title.Length < 3) continue;
+                    
+                    // If body is too long (>600 chars), split further
+                    // by numbered items or blank lines
+                    if (body.Length > 600)
+                    {
+                        var subSteps = SplitLongSection(title, body);
+                        _steps.AddRange(subSteps);
+                    }
+                    else
+                    {
+                        _steps.Add(CreateStep(title, body));
+                    }
+                }
+            }
+            else
+            {
+                // Fall back to H2 splitting
+                var h2Pattern = @"(?=^##\s)";
+                var h2Sections = System.Text.RegularExpressions.Regex
+                    .Split(content, h2Pattern,
+                        System.Text.RegularExpressions.RegexOptions
+                            .Multiline)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+
+                foreach (var section in h2Sections)
+                {
+                    var sLines = section.Split('\n');
+                    var title = sLines[0].TrimStart('#').Trim();
+                    var body = string.Join('\n', sLines.Skip(1)).Trim();
+                    
+                    if (string.IsNullOrWhiteSpace(body)) continue;
+                    
+                    if (body.Length > 600)
+                    {
+                        var subSteps = SplitLongSection(title, body);
+                        _steps.AddRange(subSteps);
+                    }
+                    else
+                    {
+                        _steps.Add(CreateStep(title, body));
+                    }
+                }
+            }
+
+            // Step 4: Fallback — split by double newlines into chunks
+            if (_steps.Count <= 1)
+            {
+                _steps = new List<ModuleStep>();
+                var paragraphs = content
+                    .Split(new[] {"\n\n", "\r\n\r\n"}, 
+                        StringSplitOptions.RemoveEmptyEntries)
+                    .Where(p => p.Trim().Length > 50)
+                    .ToList();
                 
-                if (module == null)
+                // Group every 2-3 paragraphs into one step
+                for (int i = 0; i < paragraphs.Count; i += 2)
                 {
-                    _errorMessage = "Could not deserialize module. Response was: " + jsonString.Substring(0, Math.Min(jsonString.Length, 100));
+                    var chunk = string.Join("\n\n", 
+                        paragraphs.Skip(i).Take(2));
+                    var firstLine = chunk.Split('\n')[0]
+                        .TrimStart('#').Trim();
+                    _steps.Add(CreateStep(
+                        firstLine.Length > 3 ? firstLine : $"Part {i/2 + 1}", 
+                        chunk));
                 }
-                else
-                {
-                    _currentModule = module;
-                }
-            }
-            catch (System.Text.Json.JsonException jex)
-            {
-                 _errorMessage = $"JSON Deserialization error: {jex.Message}. Raw length: {jsonString.Length}";
             }
 
-            _sessionStartTime = DateTime.UtcNow;
-            _isLoading = false;
+            // Ensure at least 1 step
+            if (_steps.Count == 0)
+            {
+                _steps.Add(CreateStep(
+                    _currentModule!.NodeTitle, content));
+            }
+
+            // Bug 5 filtering
+            _steps = _steps.Where(step => !IsMetadataStep(step)).ToList();
+
+            // Safety fallback if everything was filtered
+            if (_steps.Count == 0)
+            {
+                _steps.Add(CreateStep(_currentModule!.NodeTitle, content));
+            }
+
+            _currentStepIndex = 0;
+            _inPracticeMode = false;
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Error loading module: {ex.Message}";
-            _isLoading = false;
+            Console.WriteLine($"Fallback Parse: {ex.Message}");
+            _steps = new List<ModuleStep> { 
+                new ModuleStep { 
+                    Title = _currentModule?.NodeTitle ?? "Lesson", 
+                    Content = markdownContent,
+                    EstimatedMinutes = 3
+                }
+            };
         }
     }
 
-    private async Task SubmitResponse()
+    private bool IsMetadataStep(ModuleStep step)
     {
-        if (string.IsNullOrWhiteSpace(_studentResponse)) return;
-        
-        _isSubmitting = true;
-        
         try
         {
-            var timeSpent = (int)(DateTime.UtcNow - _sessionStartTime).TotalSeconds;
+            if (step == null) return true;
+            var content = (step.Content ?? "").Trim();
+            var title = (step.Title ?? "").Trim().ToLower();
             
-            // Combine main response with all inline answers
-            var combinedResponse = _studentResponse;
-            if (_inlineAnswers.Any(kvp => !string.IsNullOrWhiteSpace(kvp.Value)))
+            if (content.Length < 30) return true;
+            
+            if (title.Contains("personalized learning module")) return true;
+            if (title == "learning module") return true;
+            if (title == "module overview") return true;
+            
+            var lines = content.Split('\n')
+                .Where(l => l.Trim().Length > 0)
+                .ToList();
+            
+            if (lines.Count <= 2)
             {
-                combinedResponse += "\n\n--- INLINE ANSWERS ---\n" + 
-                    string.Join("\n", _inlineAnswers.OrderBy(k => k.Key).Select(kvp => $"[Blank {kvp.Key}]: {kvp.Value}"));
+                var metaKeywords = new[] 
+                { 
+                    "topic:", "module:", "subject:", "unit:", 
+                    "chapter:", "level:", "difficulty:", 
+                    "format:", "objective:", "goal:" 
+                };
+                var allMeta = lines.All(l => 
+                    metaKeywords.Any(k => 
+                        l.Trim().ToLower().StartsWith(k)));
+                if (allMeta) return true;
+            }
+            
+            return false;
+        }
+        catch { return false; }
+    }
+
+    private List<ModuleStep> SplitLongSection(string parentTitle, string body)
+    {
+        var result = new List<ModuleStep>();
+        parentTitle = parentTitle.Replace("Learning Module: ", "", StringComparison.OrdinalIgnoreCase)
+                                 .Replace("Learning Module - ", "", StringComparison.OrdinalIgnoreCase);
+        parentTitle = parentTitle.Length > 50 ? parentTitle.Substring(0, 47) + "..." : parentTitle;
+        
+        var paragraphs = body.Split(new[] { "\n\n", "\r\n\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+        var chunk = new System.Text.StringBuilder();
+        var partNum = 1;
+
+        foreach (var p in paragraphs)
+        {
+            var text = p.Trim();
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            chunk.AppendLine(text);
+            chunk.AppendLine();
+            
+            if (chunk.Length > 400)
+            {
+                result.Add(CreateStep($"{parentTitle} (Part {partNum++})", chunk.ToString().Trim()));
+                chunk.Clear();
+            }
+        }
+        if (chunk.Length > 0)
+        {
+            result.Add(CreateStep($"{parentTitle} (Part {partNum})", chunk.ToString().Trim()));
+        }
+        
+        return result;
+    }
+
+    private ModuleStep CreateStep(string title, string content)
+    {
+        var wordCount = content.Split(
+            new[]{' ','\n'}, 
+            StringSplitOptions.RemoveEmptyEntries).Length;
+        return new ModuleStep
+        {
+            Title = title,
+            Content = content,
+            EstimatedMinutes = Math.Max(1, wordCount / 200)
+        };
+    }
+
+    private async Task NextStep()
+    {
+        if (_currentStepIndex < _steps.Count - 1)
+        {
+            _currentStepIndex++;
+            try { await JS.InvokeVoidAsync("fluxionSound.play", "advance"); } catch {}
+            try { await JS.InvokeVoidAsync("fluxionAnimations.slideIn", "step-card", "right"); } catch {}
+        }
+        else
+        {
+            _inPracticeMode = true;
+            _currentPracticeIndex = 0;
+            try { await JS.InvokeVoidAsync("fluxionSound.play", "advance"); } catch {}
+        }
+    }
+
+    private async Task PrevStep()
+    {
+        if (_currentStepIndex > 0)
+        {
+            _currentStepIndex--;
+            try { await JS.InvokeVoidAsync("fluxionSound.play", "advance"); } catch {}
+            try { await JS.InvokeVoidAsync("fluxionAnimations.slideIn", "step-card", "left"); } catch {}
+        }
+    }
+
+    private string CleanQuestion(string q) => System.Text.RegularExpressions.Regex.Replace(q.Trim(), @"^\d+\.\s+", "");
+
+    enum QuestionType { Text, TrueFalse, Code }
+    private QuestionType DetectQuestionType(string q)
+    {
+        var lower = q.ToLower();
+        if (lower.Contains("true or false") || lower.Contains("true/false")) return QuestionType.TrueFalse;
+        if ((lower.Contains("write") || lower.Contains("implement") || lower.Contains("code")) && (lower.Contains("```") || lower.Contains("c#"))) return QuestionType.Code;
+        return QuestionType.Text;
+    }
+
+    private void SetAnswer(string val) => _practiceAnswers[_currentPracticeIndex] = val;
+
+    private async Task NextQuestion()
+    {
+        if (_currentPracticeIndex < _currentModule!.PracticeQuestions.Count - 1)
+        {
+            _currentPracticeIndex++;
+            try { await JS.InvokeVoidAsync("fluxionSound.play", "advance"); } catch {}
+            try { await JS.InvokeVoidAsync("fluxionAnimations.slideIn", "practice-card", "right"); } catch {}
+        }
+    }
+
+    private async Task SubmitPractice()
+    {
+        _isSubmitting = true;
+        try
+        {
+            var payload = string.Join("\n\n---\n\n", _practiceAnswers);
+            var req = new { LearnerId = _learnerId, NodeId = _currentModule!.NodeId, Response = payload, TimeSpentSeconds = (int)(DateTime.UtcNow - _sessionStartTime).TotalSeconds };
+            var res = await Http.PostAsJsonAsync("api/curriculum/submit", req);
+            _feedback = await res.Content.ReadFromJsonAsync<StudentFeedback>();
+            
+            if (_feedback?.NodeMastered == true)
+            {
+                _showMasteryOverlay = true;
+                try { await JS.InvokeVoidAsync("fluxionSound.play", "mastered"); } catch {}
+            }
+            else
+            {
+                try { await JS.InvokeVoidAsync("fluxionSound.play", "wrong"); } catch {}
             }
 
-            var request = new 
+            // Real Mastery update after answering
+            _ = RefreshMasteryData();
+
+            // Cognitive Load Recalculation (BUG 1)
+            var wasCorrect = _feedback?.NodeMastered == true || _feedback?.MasteryScore >= 0.7;
+            _recentAnswers.Add(new AnswerRecord 
+            { 
+                IsCorrect = wasCorrect,
+                AnsweredAt = DateTime.UtcNow
+            });
+            _cognitiveLoad = CalculateCognitiveLoad();
+
+            try {
+                await JS.InvokeVoidAsync("fluxionBrainState.update", "brain-state-canvas", _cognitiveLoad);
+            } catch { }
+
+            try
             {
-                LearnerId = _learnerId,
-                NodeId = _currentModule!.NodeId,
-                Response = combinedResponse,
-                TimeSpentSeconds = timeSpent,
-                HintRequests = 0,
-                ErrorCount = 0
-            };
-
-            var response = await Http.PostAsJsonAsync("api/curriculum/submit", request);
-            
-            var jsonStr = await response.Content.ReadAsStringAsync();
-            
-            using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
-            var root = doc.RootElement;
-
-            _feedback = new Fluxion.Core.Models.StudentFeedback
-            {
-                MasteryScore = root.TryGetProperty("masteryScore", out var ms) && ms.ValueKind == System.Text.Json.JsonValueKind.Number 
-                    ? ms.GetDouble() : 0.5,
-                EvaluationDetails = root.TryGetProperty("evaluationDetails", out var ed) && ed.ValueKind == System.Text.Json.JsonValueKind.String 
-                    ? ed.GetString() ?? "" : "Evaluation recorded.",
-                NodeMastered = root.TryGetProperty("nodeMastered", out var nm) && nm.ValueKind == System.Text.Json.JsonValueKind.True,
-                NodeTitle = root.TryGetProperty("nodeTitle", out var nt) && nt.ValueKind == System.Text.Json.JsonValueKind.String 
-                    ? nt.GetString() ?? "" : ""
-            };
+                await Http.PutAsJsonAsync($"api/curriculum/learners/{_learnerId}/cognitive-load", new { CognitiveLoadIndex = _cognitiveLoad });
+            }
+            catch { /* non-critical, don't block UI */ }
         }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Submission error: {ex.Message}";
-        }
-
+        catch { _initError = "Submission failed."; }
         _isSubmitting = false;
     }
 
-    private static string SanitizeHtml(string html)
+    private void RecalculateMastery()
     {
-        // BUG 8 FIX: Use the HtmlSanitizer library instead of incomplete regex.
-        // This properly handles unquoted event handlers, javascript: URIs,
-        // <iframe>/<object>/<embed> tags, CSS injection, and more.
-        var sanitizer = new Ganss.Xss.HtmlSanitizer();
-        return sanitizer.Sanitize(html);
+        try
+        {
+            if (_learner == null || _allNodes == null) return;
+            
+            _totalNodes = _allNodes.Count;
+            _masteredCount = 0;
+            
+            foreach (var node in _allNodes)
+            {
+                var score = _learner.MasteryEntries.FirstOrDefault(m => m.NodeId == node.Id)?.MasteryScore ?? 0;
+                if (score >= node.MasteryThreshold)
+                {
+                    _masteredCount++;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Mastery calc error: {ex.Message}");
+        }
     }
 
-    private void ClearFeedback()
+    private double CalculateCognitiveLoad()
     {
-        _feedback = null;
+        try
+        {
+            if (_recentAnswers == null || _recentAnswers.Count == 0)
+            {
+                return Math.Max(_learner?.CognitiveLoadIndex ?? 0.3, 0.3);
+            }
+            
+            // Safe TakeLast alternative
+            var total = _recentAnswers.Count;
+            var skip = Math.Max(0, total - 5);
+            var recent = _recentAnswers.Skip(skip).ToList();
+            
+            if (recent.Count == 0) return 0.3;
+            
+            var correctCount = 0;
+            foreach (var a in recent)
+                if (a.IsCorrect) correctCount++;
+            
+            var accuracy = (double)correctCount / recent.Count;
+            var load = 1.0 - (accuracy * 0.7) - 0.1;
+            
+            // Manual Clamp
+            if (load < 0.15) load = 0.15;
+            if (load > 0.95) load = 0.95;
+            
+            return load;
+        }
+        catch
+        {
+            return 0.3;
+        }
     }
+
+    private void StartSessionTimer()
+    {
+        _sessionStartTime = DateTime.UtcNow;
+        _sessionTimerObj?.Dispose();
+        _sessionTimerObj = new System.Threading.Timer(async _ =>
+        {
+            var elapsed = DateTime.UtcNow - _sessionStartTime;
+            _sessionTimerDisplay = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+            await InvokeAsync(StateHasChanged);
+        }, null, 0, 1000);
+    }
+
+    private async void RebindJS()
+    {
+        try 
+        {
+            await Task.Delay(100);
+            await JS.InvokeVoidAsync("fluxionBrainState.draw", "brain-state-canvas", _cognitiveLoad);
+            await JS.InvokeVoidAsync("fluxionAnimations.countUp", "stat-mastered", _masteredCount, 1000);
+            await JS.InvokeVoidAsync("fluxionAnimations.countUp", "stat-streak", _streak, 1000);
+        } catch {}
+    }
+
+    private double? GetNodeThreshold(Guid nodeId)
+    {
+        return _allNodes?
+            .FirstOrDefault(n => n.Id == nodeId)
+            ?.MasteryThreshold ?? 0.7;
+    }
+
+    private async Task RefreshMasteryData()
+    {
+        try
+        {
+            var learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
+            if (learnerId != Guid.Empty)
+            {
+                _learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{learnerId}");
+                
+                if (_learner != null && _allNodes != null)
+                {
+                    _masteredCount = _learner.MasteryEntries
+                        .Count(m => m.MasteryScore >= (_allNodes.FirstOrDefault(n => n.Id == m.NodeId)?.MasteryThreshold ?? 0.7));
+                }
+                StateHasChanged();
+                RebindJS(); // refresh DOM numbers
+            }
+        }
+        catch { }
+    }
+
+    private string GetBrainStateLabel(double load) => load switch {
+        var l when l < 0.3 => "Relaxed & Focused",
+        var l when l < 0.6 => "Engaged",
+        var l when l < 0.8 => "High Effort",
+        _ => "Overloaded"
+    };
+
+    private void CloseOverlay() { _showMasteryOverlay = false; _ = LoadNextModule(); }
+    private void RetryLoad() => _ = LoadNextModule();
+
+    private static string SanitizeHtml(string html) => new Ganss.Xss.HtmlSanitizer().Sanitize(html);
 
     public async ValueTask DisposeAsync()
     {
-        if (_hubConnection is not null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
+        _sessionTimerObj?.Dispose();
+        if (_hubConnection != null) await _hubConnection.DisposeAsync();
     }
 }
+
+<!-- No inline code needed, utilizing Shared/TeleportToSidebar.razor -->

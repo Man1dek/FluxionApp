@@ -1,0 +1,32 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div @ref="_srcDiv" style="display:none;">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private ElementReference _srcDiv;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("eval", @"
+            (function(srcEl) {
+                const tgt = document.getElementById('right-sidebar-slot');
+                if(srcEl && tgt && tgt.innerHTML !== srcEl.innerHTML) {
+                    tgt.innerHTML = '';
+                    Array.from(srcEl.children).forEach(c => tgt.appendChild(c.cloneNode(true)));
+                }
+            })(arguments[0]);
+        ", _srcDiv);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try {
+            await JS.InvokeVoidAsync("eval", "const t=document.getElementById('right-sidebar-slot'); if(t) t.innerHTML='';");
+        } catch { }
+    }
+}

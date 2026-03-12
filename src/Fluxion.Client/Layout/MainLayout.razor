@@ -1,86 +1,195 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @implements IDisposable
 @inject IJSRuntime JS
+@using Fluxion.Client.Services
+@inject ThemeService Theme
+@inject SoundService Sound
+@inject AnimationService Animations
 
-<div class="page">
-    <header class="site-header">
-        <div class="header-left">
-            <a href="/" class="header-logo">
-                FLUXION <span class="logo-dot"></span>
-            </a>
+<div class="page @(_focusMode ? "focus-mode" : "")">
+    <AuthorizeView>
+        <Authorized>
+            <!-- 3-Panel Dashboard Shell -->
+            <div class="dashboard-shell @(_focusMode ? "focus-mode" : "")">
+                
+                <!-- MOBILE HEADER -->
+                <header class="mobile-header">
+                    <button class="btn btn-outline" style="padding: 0.5rem; border:none;" @onclick="ToggleMobileMenu">
+                        <span style="font-size:1.5rem;">☰</span>
+                    </button>
+                    <a href="/" class="logo" style="margin:0; font-size:1.2rem;">
+                        FLUXION <span class="logo-dot" style="width:6px; height:6px;"></span>
+                    </a>
+                    <ThemeToggle />
+                </header>
 
-            <AuthorizeView>
-                <Authorized>
-                    <nav class="header-nav">
-                        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                            <span class="nav-icon">⚡</span> Dashboard
-                        </NavLink>
-                        <NavLink class="nav-link" href="progress">
-                            <span class="nav-icon">🗺️</span> Progress
-                        </NavLink>
-                    </nav>
-                </Authorized>
-            </AuthorizeView>
-        </div>
+                <!-- LEFT SIDEBAR -->
+                <NavMenu IsMobileOpen="@_mobileMenuOpen" OnCloseMobileMenu="() => _mobileMenuOpen = false" />
 
-        <div class="header-actions">
-            <AuthorizeView>
-                <Authorized>
-                    <button class="btn btn-outline btn-sm" @onclick="Logout">Sign Out</button>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="login" class="btn btn-outline btn-sm" style="text-decoration:none;">Sign In</a>
-                    <a href="register" class="btn btn-primary btn-sm" style="text-decoration:none;">Get Started</a>
-                </NotAuthorized>
-            </AuthorizeView>
-        </div>
-    </header>
+                <!-- MAIN AREA (pages handle their own inner layout) -->
+                <div class="dashboard-main-area" id="center-content">
+                    <ErrorBoundary @ref="_errorBoundary">
+                        <ChildContent>
+                            @Body
+                        </ChildContent>
+                        <ErrorContent Context="errorContext">
+                            <div class="glass-card" style="margin: 2rem; padding: 3rem; text-align: center;">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📡</div>
+                                <h2 class="heading-lg mb-sm">Neural Link Interrupted</h2>
+                                <p class="text-dim mb-xl">A synchronization error occurred while rendering this sector.</p>
+                                <button class="btn btn-cyan" @onclick="Recover">Re-sync Sector →</button>
+                            </div>
+                        </ErrorContent>
+                    </ErrorBoundary>
+                </div>
 
-    <main>
-        <div class="content-wrapper">
-            @Body
-        </div>
-    </main>
-
-    <footer class="site-footer">
-        <span class="footer-brand">FLUXION</span>
-        <span>v1.0 · AI-Powered Adaptive Learning</span>
-    </footer>
+                @if (_focusMode)
+                {
+                    <button class="focus-exit-badge" @onclick="ToggleFocusMode">
+                        EXIT FOCUS
+                    </button>
+                }
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <!-- Unauthenticated Top Navigation -->
+            <header class="landing-nav">
+                <a href="/" class="logo" style="margin:0; font-size:1.3rem;">
+                    FLUXION <span class="logo-dot" style="width:6px; height:6px;"></span>
+                </a>
+                <div class="landing-nav-actions">
+                    <div class="theme-toggle-wrapper">
+                        <ThemeToggle />
+                    </div>
+                    <a href="login" class="btn btn-outline btn-sm" style="border:none;">Sign In</a>
+                    <a href="register" class="btn btn-primary btn-sm">Get Started</a>
+                </div>
+            </header>
+            
+            <main class="main-content">
+                @Body
+            </main>
+        </NotAuthorized>
+    </AuthorizeView>
 </div>
 
 @code {
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-    [Inject] private Blazored.LocalStorage.ILocalStorageService LocalStorage { get; set; } = default!;
+    
+    private ErrorBoundary? _errorBoundary;
+    private bool _focusMode = false;
+    private bool _mobileMenuOpen = false;
+
+    private void ToggleMobileMenu() => _mobileMenuOpen = !_mobileMenuOpen;
+
+    private void Recover()
+    {
+        _errorBoundary?.Recover();
+        StateHasChanged();
+    }
 
     protected override void OnInitialized()
     {
+        Theme.OnThemeChanged += OnThemeChanged;
+        Sound.OnSoundToggled += OnSoundToggled;
+        Animations.OnAnimationToggled += OnAnimationToggled;
         Navigation.LocationChanged += OnLocationChanged;
     }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    private void OnSoundToggled() => InvokeAsync(StateHasChanged);
+    private void OnAnimationToggled() => InvokeAsync(StateHasChanged);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("window.initializeKinetic");
+            await Theme.InitializeAsync(JS);
+            await Sound.InitializeAsync();
+            await Animations.InitializeAsync();
+        }
+
+        // ═══ BUG 1 FIX: Set body class based on auth state ═══
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var isAuth = authState.User.Identity?.IsAuthenticated == true;
+            
+            if (isAuth)
+            {
+                await JS.InvokeVoidAsync("eval", "document.body.className='dashboard-active'");
+            }
+            else
+            {
+                // Check if on login/register page
+                var uri = Navigation.Uri.ToLower();
+                if (uri.Contains("/login") || uri.Contains("/register"))
+                {
+                    await JS.InvokeVoidAsync("eval", "document.body.className='auth-page-active'");
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("eval", "document.body.className='landing-page'");
+                }
+            }
+        }
+        catch { }
+
+        if (firstRender)
+        {
+            StateHasChanged();
         }
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
-        // Fire and forget JS initialization on navigation
+        _mobileMenuOpen = false;
         _ = JS.InvokeVoidAsync("window.initializeKinetic");
+        // Re-apply body class on navigation
+        _ = SetBodyClassAsync();
+        StateHasChanged();
     }
 
-    private async Task Logout()
+    private async Task SetBodyClassAsync()
     {
-        await LocalStorage.RemoveItemAsync("authToken");
-        ((Fluxion.Client.Services.FluxionAuthStateProvider)AuthStateProvider).NotifyUserLogout();
-        Navigation.NavigateTo("login");
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var isAuth = authState.User.Identity?.IsAuthenticated == true;
+            
+            if (isAuth)
+            {
+                await JS.InvokeVoidAsync("eval", "document.body.className='dashboard-active'");
+            }
+            else
+            {
+                var uri = Navigation.Uri.ToLower();
+                if (uri.Contains("/login") || uri.Contains("/register"))
+                {
+                    await JS.InvokeVoidAsync("eval", "document.body.className='auth-page-active'");
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("eval", "document.body.className='landing-page'");
+                }
+            }
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public void ToggleFocusMode()
+    {
+        _focusMode = !_focusMode;
+        StateHasChanged();
     }
 
     public void Dispose()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+        Theme.OnThemeChanged -= OnThemeChanged;
+        Sound.OnSoundToggled -= OnSoundToggled;
+        Animations.OnAnimationToggled -= OnAnimationToggled;
     }
 }

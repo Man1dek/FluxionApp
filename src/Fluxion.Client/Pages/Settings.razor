@@ -1,0 +1,109 @@
+@page "/settings"
+@using Fluxion.Client.Services
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@inject SoundService Sound
+@inject ThemeService Theme
+@inject IJSRuntime JS
+@inject AnimationService Animations
+@implements IDisposable
+
+<PageTitle>Settings - Fluxion</PageTitle>
+
+<div class="dashboard-header mb-xl slide-in">
+    <h1 class="heading-xl">Settings</h1>
+    <p class="text-dim" style="font-size: 1.1rem; margin-top: 0.5rem;">Configure your Fluxion experience.</p>
+</div>
+
+<div class="settings-grid scale-in" style="display: grid; gap: 1.25rem; max-width: 800px;">
+
+    <!-- Profile Section -->
+    <div class="sidebar-card">
+        <div class="sidebar-card-title">👤 Profile</div>
+        <div class="flex items-center gap-md" style="padding: 0.5rem 0;">
+            <div style="width: 50px; height: 50px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.5rem;">
+                @(!string.IsNullOrEmpty(_username) ? _username[0].ToString().ToUpper() : "?")
+            </div>
+            <div style="flex: 1;">
+                <h2 class="heading-md" style="margin:0;">@_username</h2>
+                <p class="text-dim" style="margin:0; font-size:0.85rem;">Learner</p>
+            </div>
+            <button class="btn btn-outline btn-sm" @onclick="Logout">Sign Out</button>
+        </div>
+    </div>
+
+    <!-- Appearance Section -->
+    <div class="sidebar-card">
+        <div class="sidebar-card-title">🎨 Appearance</div>
+        <div class="stat-row" style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); margin:0;">
+            <div>
+                <div style="font-weight: 600;">Theme</div>
+                <div class="text-dim" style="font-size: 0.85rem;">Toggle between dark and light mode</div>
+            </div>
+            <div class="theme-toggle-wrapper">
+                <ThemeToggle />
+            </div>
+        </div>
+        
+        <div class="stat-row" style="padding: 0.75rem 0; margin:0;">
+            <div>
+                <div style="font-weight: 600;">Animations</div>
+                <div class="text-dim" style="font-size: 0.85rem;">Enable UI transitions and effects</div>
+            </div>
+            <button class="theme-toggle-btn" @onclick="() => Animations.ToggleAnimationsAsync()" style="width: 50px; margin: 0;">
+                <div class="theme-toggle-thumb" style="transform: translateX(@(Animations.AreAnimationsEnabled ? "18px" : "0")); box-shadow: none; border: @(Animations.AreAnimationsEnabled ? "1px solid var(--accent-purple)" : "1px solid var(--text-secondary)"); background: var(--card-bg);"></div>
+                <span class="theme-toggle-icon" style="opacity: @(Animations.AreAnimationsEnabled ? "0.3" : "1")">🚫</span>
+                <span class="theme-toggle-icon" style="opacity: @(Animations.AreAnimationsEnabled ? "1" : "0.3")">✨</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Audio Section -->
+    <div class="sidebar-card">
+        <div class="sidebar-card-title">🔊 Audio</div>
+        <div class="stat-row" style="padding: 0.75rem 0; margin:0;">
+            <div>
+                <div style="font-weight: 600;">Sound Effects</div>
+                <div class="text-dim" style="font-size: 0.85rem;">Play sounds for interactions and feedback</div>
+            </div>
+            <button class="theme-toggle-btn" @onclick="() => Sound.ToggleSoundAsync()" style="width: 50px; margin: 0;">
+                <div class="theme-toggle-thumb" style="transform: translateX(@(Sound.IsSoundEnabled ? "18px" : "0")); box-shadow: none; border: @(Sound.IsSoundEnabled ? "1px solid var(--accent-cyan)" : "1px solid var(--text-secondary)"); background: var(--card-bg);"></div>
+                <span class="theme-toggle-icon" style="opacity: @(Sound.IsSoundEnabled ? "0.3" : "1")">🔇</span>
+                <span class="theme-toggle-icon" style="opacity: @(Sound.IsSoundEnabled ? "1" : "0.3")">🔊</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private string _username = "Learner";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(authState.User.Identity.Name))
+        {
+            _username = authState.User.Identity.Name;
+        }
+        
+        Sound.OnSoundToggled += StateHasChanged;
+        Animations.OnAnimationToggled += StateHasChanged;
+    }
+
+    private async Task Logout()
+    {
+        try { await JS.InvokeVoidAsync("fluxionSound.play", "advance"); } catch {}
+        await LocalStorage.RemoveItemAsync("authToken");
+        await LocalStorage.RemoveItemAsync("learnerId");
+        ((Fluxion.Client.Services.FluxionAuthStateProvider)AuthStateProvider).NotifyUserLogout();
+        Navigation.NavigateTo("login");
+    }
+
+    public void Dispose()
+    {
+        Sound.OnSoundToggled -= StateHasChanged;
+        Animations.OnAnimationToggled -= StateHasChanged;
+    }
+}

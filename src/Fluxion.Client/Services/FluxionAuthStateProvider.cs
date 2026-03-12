@@ -26,14 +26,42 @@ public class FluxionAuthStateProvider : AuthenticationStateProvider
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            _httpClient.DefaultRequestHeaders.Authorization = null;
-            return _anonymous;
+            return ClearAuth();
         }
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        try
+        {
+            var claims = ParseClaimsFromJwt(token).ToList();
+            var expClaim = claims.FirstOrDefault(c => c.Type == "exp");
+            
+            if (expClaim != null && long.TryParse(expClaim.Value, out var expStr))
+            {
+                var expDate = DateTimeOffset.FromUnixTimeSeconds(expStr).UtcDateTime;
+                if (expDate <= DateTime.UtcNow)
+                {
+                    // Token is expired. Wipe it out.
+                    await _localStorage.RemoveItemAsync("authToken");
+                    await _localStorage.RemoveItemAsync("learnerId");
+                    return ClearAuth();
+                }
+            }
 
-        return new AuthenticationState(new ClaimsPrincipal(
-            new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt")));
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt")));
+        }
+        catch
+        {
+            // Corrupt token
+            await _localStorage.RemoveItemAsync("authToken");
+            await _localStorage.RemoveItemAsync("learnerId");
+            return ClearAuth();
+        }
+    }
+
+    private AuthenticationState ClearAuth()
+    {
+        _httpClient.DefaultRequestHeaders.Authorization = null;
+        return _anonymous;
     }
 
     public void NotifyUserAuthentication(string token)

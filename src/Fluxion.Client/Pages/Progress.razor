@@ -2,83 +2,98 @@
 @using Fluxion.Core.Models
 @inject HttpClient Http
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <PageTitle>Knowledge Graph — Fluxion</PageTitle>
 
-<div class="page-header">
-    <div>
-        <h1 class="heading-xl text-gradient">Knowledge Graph</h1>
-        <p class="text-dim mt-sm">Your personalized path through the curriculum topology</p>
-    </div>
-</div>
-
-@if (!string.IsNullOrEmpty(_error))
-{
-    <div class="glass-card" style="padding:2rem;">
-        <div class="alert-error">
-            <span>⚠️</span> @_error
+<div class="center-panel">
+    <div class="page-header" style="border-bottom:none;">
+        <div>
+            <h1 class="heading-xl text-gradient">Knowledge Graph</h1>
+            <p class="text-dim mt-sm">Your personalized path through the curriculum topology</p>
         </div>
     </div>
-}
-else if (_nodes == null)
-{
-    <div class="text-center" style="padding:4rem 0;">
-        <div class="spinner mb-lg"></div>
-        <p class="text-dim">Loading curriculum map…</p>
-    </div>
-}
-else
-{
-    <div class="graph-grid">
-        @foreach (var node in _nodes.OrderBy(n => n.DifficultyLevel))
-        {
-            var mastery = _mastery.GetValueOrDefault(node.Id, 0.0);
-            var isMastered = mastery >= node.MasteryThreshold;
+
+    @if (_isLoading)
+    {
+        <div class="text-center" style="padding:4rem 0;">
+            <div class="spinner mb-lg" style="margin:0 auto"></div>
+            <p class="text-dim">Rendering curriculum topology…</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="glass-card" style="padding:2rem; text-align:center;">
+            <div style="font-size:2rem; margin-bottom:1rem;">⚠️</div>
+            <p class="text-dim mb-lg">@_error</p>
+            <button class="btn btn-cyan" @onclick="OnInitializedAsync">Retry Sync →</button>
+        </div>
+    }
+    else if (_nodes == null || !_nodes.Any())
+    {
+        <div class="glass-card" style="padding:2rem; text-align:center;">
+            <p class="text-dim">No curriculum nodes found.</p>
+        </div>
+    }
+    else
+    {
+        <div class="graph-container">
+            <canvas id="knowledge-graph-canvas" style="width:100%; height:100%; display:block; cursor:crosshair; opacity:0; transition: opacity 300ms;"></canvas>
             
-            <div class="glass-card graph-node @(isMastered ? "mastered" : "")">
-                <div class="node-title">@node.Title</div>
-                <div class="node-level">
-                    <span class="tag tag-accent" style="padding:0.2rem 0.6rem; font-size:0.65rem;">Level @node.DifficultyLevel</span>
-                    @if (isMastered)
-                    {
-                        <span class="tag" style="padding:0.2rem 0.6rem; font-size:0.65rem; background:rgba(16,185,129,0.06); color:var(--emerald); border:1px solid rgba(16,185,129,0.15);">✓ Mastered</span>
-                    }
+            <div class="graph-legend">
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #10B981; box-shadow: 0 0 10px #10B981;"></span>
+                    <span>Mastered</span>
                 </div>
-                @if (mastery > 0)
-                {
-                    <div class="mastery-bar">
-                        <div class="fill" style="width: @(mastery * 100)%"></div>
-                    </div>
-                }
-                else
-                {
-                    <div class="mastery-bar">
-                        <div class="fill" style="width: 0%"></div>
-                    </div>
-                }
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #7C3AED; box-shadow: 0 0 10px #7C3AED;"></span>
+                    <span>In Progress</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #94A3B8;"></span>
+                    <span>Available</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: #334155;"></span>
+                    <span>Locked</span>
+                </div>
             </div>
-        }
-    </div>
-}
+        </div>
+    }
+</div>
 
 @code {
     private List<KnowledgeNode>? _nodes;
-    private Dictionary<Guid, double> _mastery = new();
+    private Dictionary<string, double> _mastery = new();
     private string? _error;
+    private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // BUG 7 FIX: Removed manual Http.DefaultRequestHeaders.Authorization assignment.
-            // FluxionAuthStateProvider already handles setting the Bearer token on every request.
+            _isLoading = true;
+            _error = null;
+            
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                Http.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            else
+            {
+                _error = "Neural identity not found. Please re-authenticate.";
+                _isLoading = false;
+                return;
+            }
 
-            // BUG 12 FIX: Read learnerId from LocalStorage and fetch the LearnerProfile
-            // to populate _mastery with real data instead of always showing 0%.
-            var learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
-
+            // Load data
             _nodes = await Http.GetFromJsonAsync<List<KnowledgeNode>>("api/curriculum/graph/nodes");
 
+            var learnerId = await LocalStorage.GetItemAsync<Guid>("learnerId");
             if (learnerId != Guid.Empty)
             {
                 try
@@ -86,20 +101,47 @@ else
                     var learner = await Http.GetFromJsonAsync<LearnerProfile>($"api/curriculum/learners/{learnerId}");
                     if (learner?.MasteryEntries != null)
                     {
-                        _mastery = learner.MasteryEntries
-                            .ToDictionary(m => m.NodeId, m => m.MasteryScore);
+                        _mastery = learner.MasteryEntries.ToDictionary(m => m.NodeId.ToString(), m => m.MasteryScore);
                     }
                 }
-                catch
-                {
-                    // Learner profile may not exist yet (first login) — mastery stays empty
-                }
+                catch { /* Optional: log or handle partial failure */ }
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await LocalStorage.RemoveItemAsync("authToken");
+                await LocalStorage.RemoveItemAsync("learnerId");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            _error = $"Topology sync error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Neural link calibration failed: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (_nodes != null && _nodes.Any() && !_isLoading)
+            {
+                await Task.Delay(100); 
+                await JS.InvokeVoidAsync("fluxionGraph.draw", _nodes, _mastery, "knowledge-graph-canvas");
             }
         }
         catch (Exception ex)
         {
-            _error = $"Could not load knowledge graph: {ex.Message}";
-            _nodes = new List<KnowledgeNode>();
+            Console.WriteLine($"Graph Render Error: {ex.Message}");
         }
     }
 }

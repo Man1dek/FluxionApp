@@ -16,5 +16,8 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiBaseU
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, FluxionAuthStateProvider>();
+builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<SoundService>();
+builder.Services.AddScoped<AnimationService>();
 
 await builder.Build().RunAsync();

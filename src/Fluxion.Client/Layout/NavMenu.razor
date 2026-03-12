@@ -1,7 +1,38 @@
-﻿@* NavMenu is now embedded in MainLayout header — this component is kept for compatibility *@
+@using Fluxion.Client.Services
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@inject SoundService Sound
+
+<aside class="left-sidebar @(IsMobileOpen ? "mobile-open" : "")">
+    <div class="flex items-center justify-between mb-lg" style="margin-bottom:2rem; width:100%;">
+        <a href="/" class="logo" style="margin:0;">
+            FLUXION <span class="logo-dot"></span>
+        </a>
+        <button class="mobile-only btn btn-outline" style="padding:0.4rem; border:none; display:none;" @onclick="OnCloseMobileMenu">
+            <span style="font-size:1.2rem;">✕</span>
+        </button>
+    </div>
+
+    <nav style="margin-bottom: 2rem;">
+        <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+            <span style="font-size:1.2rem; width:24px;">⚡</span> Dashboard
+        </NavLink>
+        <NavLink class="nav-item" href="progress">
+            <span style="font-size:1.2rem; width:24px;">📊</span> Progress
+        </NavLink>
+        <button class="nav-item" style="opacity:0.6; cursor:default;" disabled>
+            <span style="font-size:1.2rem; width:24px;">🏆</span> Achievements <span class="tag" style="margin-left:auto; font-size:0.65rem;">Soon</span>
+        </button>
+        <NavLink class="nav-item" href="settings">
+            <span style="font-size:1.2rem; width:24px;">⚙️</span> Settings
+        </NavLink>
+    </nav>
+    
+    <div class="spacer"></div>
+</aside>
 
 @code {
-    private bool collapseNavMenu = true;
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-    private void ToggleNavMenu() { collapseNavMenu = !collapseNavMenu; }
+    [Parameter] public bool IsMobileOpen { get; set; }
+    [Parameter] public EventCallback OnCloseMobileMenu { get; set; }
 }

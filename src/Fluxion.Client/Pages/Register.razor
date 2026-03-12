@@ -1,92 +1,102 @@
 @page "/register"
-@using Fluxion.Client.Services
+@using Fluxion.Core.Models
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@layout Fluxion.Client.Layout.MainLayout
 
-<PageTitle>Create Account — Fluxion</PageTitle>
+<PageTitle>Get Started — Fluxion</PageTitle>
 
 <div class="auth-page">
     <div class="auth-visual">
-        <div class="auth-visual-content">
-            <div class="logo">FLUXION</div>
-            <div class="logo-sub">Kinetic Curriculum Engine</div>
-            <div class="auth-visual-tagline">
-                Initialize your personalized learning path.
-            </div>
-        </div>
+        <h2 class="heading-xl mb-md text-gradient" style="z-index:1;">Initialize AI Engine</h2>
+        <p class="text-dim text-center" style="max-width:300px; z-index:1;">Your personalized continuous learning journey starts here.</p>
     </div>
-
+    
     <div class="auth-form-side">
+        <div style="position:absolute; top:2rem; right:2rem;">
+            <Fluxion.Client.Shared.ThemeToggle />
+        </div>
+        
         <div class="auth-card">
-            <h2 class="heading-lg mb-sm">Create your profile</h2>
-            <p class="text-dim mb-xl" style="font-size:0.92rem;">Start your personalized learning journey today.</p>
+            <h1 class="heading-lg text-center" style="margin-bottom: 2rem;">Create Account</h1>
 
-            @if (!string.IsNullOrEmpty(_error))
+            @if (!string.IsNullOrEmpty(_errorMessage))
             {
-                <div class="alert-error">
-                    <span>⚠️</span> @_error
+                <div class="alert-error" style="margin-bottom:1.5rem;">
+                    <span>⚠️</span> @_errorMessage
                 </div>
             }
 
-            <div class="form-group">
-                <label class="label">Username</label>
-                <input @bind="_regModel.Username" 
-                       class="input" 
-                       placeholder="Choose a unique learner ID" />
-            </div>
+            <EditForm Model="@_registerModel" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
 
-            <div class="form-group">
-                <label class="label">Password</label>
-                <input @bind="_regModel.Password" 
-                       type="password" 
-                       class="input" 
-                       placeholder="Create a secure password" />
-            </div>
+                <div class="form-group">
+                    <label class="label">Username</label>
+                    <InputText @bind-Value="_registerModel.Username" class="input" placeholder="e.g. neuron_hacker" autofocus />
+                    <ValidationMessage For="@(() => _registerModel.Username)" />
+                </div>
 
-            <div class="mt-xl mb-lg">
-                <button class="btn btn-primary w-full" @onclick="HandleRegister" disabled="@_isProcessing">
-                    @(_isProcessing ? "Building Neural Path…" : "Create Account →")
-                </button>
-            </div>
+                <div class="form-group">
+                    <label class="label">Password</label>
+                    <InputText @bind-Value="_registerModel.Password" type="password" class="input" placeholder="••••••••" />
+                    <ValidationMessage For="@(() => _registerModel.Password)" />
+                </div>
 
-            <p class="text-center text-dim" style="font-size:0.85rem;">
-                Already have an account? <a href="/login" class="auth-link">Sign In</a>
+                <div class="mt-xl">
+                    <button type="submit" class="btn btn-cyan w-full" disabled="@_isLoading">
+                        @(_isLoading ? "Provisioning Profile…" : "Create Account →")
+                    </button>
+                </div>
+            </EditForm>
+            
+            <p class="text-center mt-lg text-dim" style="font-size:0.9rem;">
+                Already building a path? <a href="login" class="auth-link">Sign In</a>
             </p>
         </div>
     </div>
 </div>
 
 @code {
-    private RegisterModel _regModel = new();
-    private bool _isProcessing = false;
-    private string? _error;
+    private RegisterRequest _registerModel = new();
+    private string? _errorMessage;
+    private bool _isLoading;
 
     private async Task HandleRegister()
     {
-        _isProcessing = true;
-        _error = null;
+        _isLoading = true;
+        _errorMessage = null;
 
         try
         {
-            var response = await Http.PostAsJsonAsync("api/auth/register", _regModel);
-
+            var response = await Http.PostAsJsonAsync("api/auth/register", _registerModel);
             if (response.IsSuccessStatusCode)
             {
-                Navigation.NavigateTo("/login");
+                Navigation.NavigateTo("login");
             }
             else
             {
-                var body = await response.Content.ReadAsStringAsync();
-                _error = $"Registration failed ({(int)response.StatusCode}): {body}";
+                var error = await response.Content.ReadAsStringAsync();
+                _errorMessage = string.IsNullOrWhiteSpace(error) ? "Registration failed." : error;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _error = $"Connection error: {ex.Message}";
+            _errorMessage = "Network error. Please try again.";
         }
-
-        _isProcessing = false;
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    public class RegisterModel { public string Username { get; set; } = ""; public string Password { get; set; } = ""; }
+    public class RegisterRequest
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.StringLength(50, MinimumLength = 3)]
+        public string Username { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.StringLength(100, MinimumLength = 6)]
+        public string Password { get; set; } = string.Empty;
+    }
 }
